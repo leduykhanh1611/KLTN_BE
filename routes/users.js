@@ -2,9 +2,11 @@
 
 const express = require('express');
 const router = express.Router();
-const { registerCustomer } = require('../controllers/userController');
+const { registerCustomer, updateCustomer, softDeleteCustomer, getAllCustomers, getCustomerByIdWithVehicles } = require('../controllers/userController');
 const { check } = require('express-validator');
-
+// Import middleware xác thực và phân quyền
+const auth = require('../middleware/auth');
+const isAdmin = require('../middleware/isAdmin');
 // @route   POST /api/users/register
 // @desc    Đăng ký khách hàng mới
 // @access  Public
@@ -19,5 +21,25 @@ router.post(
   ],
   registerCustomer
 );
+// @route   PUT /api/customers/:id
+// @desc    Cập nhật thông tin khách hàng
+// @access  Private (Chỉ admin hoặc khách hàng có quyền)
+router.put('/:id', auth, updateCustomer);
 
+// @route   DELETE /api/customers/:id
+// @desc    Xóa mềm khách hàng
+// @access  Private (Chỉ admin có quyền xóa khách hàng)
+router.delete('/:id', [auth, isAdmin], softDeleteCustomer);
+
+// @route   GET /api/customers
+// @desc    Lấy tất cả khách hàng (bỏ qua khách hàng đã bị xóa mềm)
+// @access  Private (Chỉ admin hoặc nhân viên)
+router.get('/', auth, getAllCustomers);
+
+// @route   GET /api/customers/:id
+// @desc    Lấy thông tin chi tiết khách hàng bao gồm cả xe của khách hàng
+// @access  Private (Chỉ admin hoặc khách hàng có quyền)
+router.get('/:id', auth, getCustomerByIdWithVehicles);
+
+module.exports = router;
 module.exports = router;

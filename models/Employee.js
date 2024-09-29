@@ -14,7 +14,7 @@ const EmployeeSchema = new mongoose.Schema(
     role: {
       type: String,
       required: true,
-      enum: ['manager', 'technician', 'receptionist'], // Adjust roles as necessary
+      enum: ['manager', 'technician'], // Adjust roles as necessary, quản lý, nhân viên kỹ thuật
     },
     phone_number: String,
     email: {
