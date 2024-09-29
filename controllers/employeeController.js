@@ -146,3 +146,15 @@ exports.getEmployeeById = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+// Lấy danh sách các giá trị enum cho role
+exports.getRoleEnumValues = async (req, res) => {
+  try {
+    // Lấy danh sách các giá trị enum cho role từ Employee model
+    const roleEnumValues = Employee.schema.path('role').enumValues;
+
+    res.json(roleEnumValues);
+  } catch (err) {
+    console.error('Lỗi khi lấy danh sách enum của role:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};

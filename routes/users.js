@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { registerCustomer, updateCustomer, softDeleteCustomer, getAllCustomers, getCustomerByIdWithVehicles } = require('../controllers/userController');
+const { registerCustomer, updateCustomer, softDeleteCustomer, getAllCustomers, getCustomerByIdWithVehicles, getCustomersAndVehiclesByVehicleType } = require('../controllers/userController');
 const { check } = require('express-validator');
 // Import middleware xác thực và phân quyền
 const auth = require('../middleware/auth');
@@ -41,5 +41,8 @@ router.get('/', auth, getAllCustomers);
 // @access  Private (Chỉ admin hoặc khách hàng có quyền)
 router.get('/:id', auth, getCustomerByIdWithVehicles);
 
-module.exports = router;
+// @route   GET /api/customers/vehicle-type/:vehicleTypeId
+// @desc    Lấy danh sách khách hàng theo loại xe
+// @access  Private (Chỉ admin hoặc nhân viên)
+router.get('/vehicle-type/:vehicleTypeId', auth, getCustomersAndVehiclesByVehicleType);
 module.exports = router;

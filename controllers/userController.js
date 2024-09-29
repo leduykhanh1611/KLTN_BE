@@ -140,3 +140,53 @@ exports.updateCustomer = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+// Lấy danh sách khách hàng và các xe theo loại xe
+exports.getCustomersAndVehiclesByVehicleType = async (req, res) => {
+  try {
+    const { vehicleTypeId } = req.params;
+
+    // Tìm tất cả các xe theo loại xe và không bị xóa
+    const vehicles = await Vehicle.find({
+      vehicle_type_id: vehicleTypeId,
+      is_deleted: false
+    });
+
+    if (vehicles.length === 0) {
+      return res.status(404).json({ msg: 'Không tìm thấy xe nào thuộc loại xe này' });
+    }
+
+    // Lấy danh sách customer_id từ các xe tìm được
+    const customerIds = vehicles.map(vehicle => vehicle.customer_id);
+
+    // Tìm tất cả các khách hàng với customer_id tương ứng và không bị xóa
+    const customers = await Customer.find({ _id: { $in: customerIds }, is_deleted: false });
+
+    // Kết hợp khách hàng và xe của họ
+    const customerMap = new Map();
+
+    // Đầu tiên, tạo một map cho các khách hàng
+    customers.forEach(customer => {
+      customerMap.set(customer._id.toString(), {
+        customer: customer,
+        vehicles: []
+      });
+    });
+
+    // Tiếp theo, thêm các xe vào danh sách của từng khách hàng tương ứng
+    vehicles.forEach(vehicle => {
+      const customerIdStr = vehicle.customer_id.toString();
+      if (customerMap.has(customerIdStr)) {
+        customerMap.get(customerIdStr).vehicles.push(vehicle);
+      }
+    });
+
+    // Chuyển từ map thành mảng để trả về
+    const result = Array.from(customerMap.values());
+
+    // Trả về thông tin khách hàng và các xe của họ
+    res.json(result);
+  } catch (err) {
+    console.error('Lỗi khi lấy danh sách khách hàng và xe:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};

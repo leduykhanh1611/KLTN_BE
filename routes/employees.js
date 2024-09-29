@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { registerEmployee, updateEmployee, softDeleteEmployee, getAllEmployees, getEmployeeById} = require('../controllers/employeeController');
+const { registerEmployee, updateEmployee, softDeleteEmployee, getAllEmployees, getEmployeeById, getRoleEnumValues} = require('../controllers/employeeController');
 const { check } = require('express-validator');
 
 // Import middleware xác thực và phân quyền
@@ -41,8 +41,14 @@ router.delete('/:id', [auth, isAdmin], softDeleteEmployee);
 // @access  Private (Chỉ admin hoặc nhân viên)
 router.get('/', [auth, isAdmin], getAllEmployees);
 
+// @route   GET /api/employees/roles
+// @desc    Lấy danh sách các giá trị enum của role
+// @access  Public
+router.get('/roles', auth, getRoleEnumValues);
 // @route   GET /api/employees/:id
 // @desc    Lấy thông tin chi tiết nhân viên
 // @access  Private (Chỉ admin hoặc nhân viên)
 router.get('/:id',  [auth, isAdmin], getEmployeeById);
+
+
 module.exports = router;
