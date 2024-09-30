@@ -3,7 +3,7 @@
 const express = require('express');
 const connectDB = require('./config/database');
 require('dotenv').config();
-
+const cors = require('cors');
 const app = express();
 
 // Kết nối tới MongoDB
