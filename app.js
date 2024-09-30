@@ -23,6 +23,10 @@ app.use('/api/prices', require('./routes/prices'));
 app.use('/api/services', require('./routes/services')); 
 const PORT = process.env.PORT || 5000;
 
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  credentials: true,
+}));
 app.listen(PORT, () => {
   console.log(`Server chạy trên cổng ${PORT}`);
 });
