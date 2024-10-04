@@ -10,7 +10,7 @@ const PromotionLineSchema = new mongoose.Schema(
     discount_type: {
       type: String,
       required: true,
-      enum: ['percentage', 'fixed'], // Adjust types as necessary
+      enum: ['percentage', 'fixed'], // Adjust types as necessary Giảm giá theo phần trăm và giảm giá cố định
     },
     discount_value: {
       type: Number,

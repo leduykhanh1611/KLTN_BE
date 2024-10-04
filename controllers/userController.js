@@ -3,6 +3,7 @@
 const User = require('../models/User');
 const Customer = require('../models/Customer');
 const Vehicle = require('../models/Vehicle');
+const CustomerRank = require('../models/CustomerRank');
 const bcrypt = require('bcryptjs');
 const { validationResult } = require('express-validator');
 
@@ -22,7 +23,7 @@ exports.registerCustomer = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({ msg: 'Email đã được sử dụng' });
     }
-    
+
     // Tạo instance mới cho User
     const user = new User({
       username,
@@ -38,6 +39,10 @@ exports.registerCustomer = async (req, res) => {
     // Lưu User vào database
     await user.save();
 
+    // Lấy hạng khách hàng có min_spending thấp nhất
+    const lowestRank = await CustomerRank.findOne({ is_deleted: false })
+      .sort({ min_spending: 1 });
+
     // Tạo instance mới cho Customer
     const customer = new Customer({
       user_id: user._id,
@@ -45,6 +50,7 @@ exports.registerCustomer = async (req, res) => {
       name,
       address,
       phone_number,
+      customer_rank_id: lowestRank ? lowestRank._id : null, // Gán hạng thấp nhất nếu có
       total_spending: 0,
       is_deleted: false,
     });
@@ -62,8 +68,10 @@ exports.registerCustomer = async (req, res) => {
 exports.getCustomerByIdWithVehicles = async (req, res) => {
   try {
     // Tìm khách hàng theo ID và kiểm tra is_deleted
-    const customer = await Customer.findOne({ _id: req.params.id, is_deleted: false });
-    
+    const customer = await Customer.findOne({ _id: req.params.id, is_deleted: false })
+      .populate('customer_rank_id')
+      .lean(); // Sử dụng lean() để dễ dàng chỉnh sửa dữ liệu sau khi truy vấn;
+
     if (!customer) {
       return res.status(404).json({ msg: 'Không tìm thấy khách hàng' });
     }
@@ -85,7 +93,9 @@ exports.getCustomerByIdWithVehicles = async (req, res) => {
 exports.getAllCustomers = async (req, res) => {
   try {
     // Tìm tất cả khách hàng với điều kiện is_deleted là false
-    const customers = await Customer.find({ is_deleted: false });
+    const customers = await Customer.find({ is_deleted: false })
+      .populate('customer_rank_id')
+      .lean(); // Sử dụng lean() để dễ dàng chỉnh sửa dữ liệu sau khi truy vấn;
     res.json(customers);
   } catch (err) {
     console.error('Lỗi khi lấy danh sách Customer:', err.message);
@@ -159,7 +169,8 @@ exports.getCustomersAndVehiclesByVehicleType = async (req, res) => {
     const customerIds = vehicles.map(vehicle => vehicle.customer_id);
 
     // Tìm tất cả các khách hàng với customer_id tương ứng và không bị xóa
-    const customers = await Customer.find({ _id: { $in: customerIds }, is_deleted: false });
+    const customers = await Customer.find({ _id: { $in: customerIds }, is_deleted: false }).populate('customer_rank_id')
+    .lean(); // Sử dụng lean() để dễ dàng chỉnh sửa dữ liệu sau khi truy vấn;
 
     // Kết hợp khách hàng và xe của họ
     const customerMap = new Map();

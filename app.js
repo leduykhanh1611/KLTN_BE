@@ -26,6 +26,9 @@ app.use("/api/vehicle-types", require("./routes/vehicleTypes"));
 app.use("/api/vehicles", require("./routes/vehicles"));
 app.use("/api/prices", require("./routes/prices"));
 app.use("/api/services", require("./routes/services"));
+app.use("/api/promotions", require("./routes/promotions"));
+app.use('/api/customers-rank', require('./routes/customers_rank'));
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
