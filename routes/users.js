@@ -46,8 +46,8 @@ router.get('/:id', auth, getCustomerByIdWithVehicles);
 // @access  Private (Chỉ admin hoặc nhân viên)
 router.get('/vehicle-type/:vehicleTypeId', auth, getCustomersAndVehiclesByVehicleType);
 
-// @route   POST /api/customers/activate-account/:id
+// @route   GET /api/customers/activate-account/:id
 // @desc    Kích hoạt tài khoản khách hàng
 // @access  Không có
-router.post('/activate/:activationToken', activateCustomerAccount);
+router.get('/activate/:activationToken', activateCustomerAccount);
 module.exports = router;

@@ -5,6 +5,7 @@ const Employee = require('../models/Employee');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 // Đăng ký Employee mới
