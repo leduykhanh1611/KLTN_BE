@@ -149,8 +149,7 @@ exports.cancelAppointment = async (req, res) => {
     if (!appointment || appointment.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn' });
     }
-
-    appointment.is_deleted = true;
+    appointment.status = 'cancelled';
     await appointment.save();
 
     // Cập nhật trạng thái slot thành "available" nếu lịch hẹn bị hủy
