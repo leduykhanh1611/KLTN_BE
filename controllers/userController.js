@@ -1,5 +1,3 @@
-// controllers/userController.js
-
 const User = require('../models/User');
 const Customer = require('../models/Customer');
 const Vehicle = require('../models/Vehicle');
@@ -7,6 +5,7 @@ const CustomerRank = require('../models/CustomerRank');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const { validationResult } = require('express-validator');
+const path = require('path'); // Thêm import path
 const jwt = require('jsonwebtoken');
 // Đăng ký khách hàng mới
 exports.registerCustomer = async (req, res) => {
@@ -86,7 +85,8 @@ exports.registerCustomer = async (req, res) => {
     // Gửi email
     await transporter.sendMail(mailOptions);
 
-    res.status(201).json({ msg: 'Khách hàng mới đã được tạo. Vui lòng kiểm tra email để kích hoạt tài khoản.', user, customer });
+    // Trả về trang HTML thông báo thành công
+    res.sendFile(path.join(__dirname, '../public/success.html'));
   } catch (err) {
     console.error('Lỗi khi đăng ký khách hàng:', err.message);
     res.status(500).send('Lỗi máy chủ');
