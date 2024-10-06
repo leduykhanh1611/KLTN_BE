@@ -5,8 +5,9 @@ const Customer = require('../models/Customer');
 const Vehicle = require('../models/Vehicle');
 const CustomerRank = require('../models/CustomerRank');
 const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
 const { validationResult } = require('express-validator');
-
+const jwt = require('jsonwebtoken');
 // Đăng ký khách hàng mới
 exports.registerCustomer = async (req, res) => {
   // Kiểm tra lỗi từ express-validator
@@ -24,12 +25,13 @@ exports.registerCustomer = async (req, res) => {
       return res.status(400).json({ msg: 'Email đã được sử dụng' });
     }
 
-    // Tạo instance mới cho User
+    // Tạo instance mới cho User với trạng thái kích hoạt là false
     const user = new User({
       username,
       password,
       email,
       role: 'customer',
+      is_active: false,
     });
 
     // Hash mật khẩu
@@ -40,8 +42,7 @@ exports.registerCustomer = async (req, res) => {
     await user.save();
 
     // Lấy hạng khách hàng có min_spending thấp nhất
-    const lowestRank = await CustomerRank.findOne({ is_deleted: false })
-      .sort({ min_spending: 1 });
+    const lowestRank = await CustomerRank.findOne({ is_deleted: false }).sort({ min_spending: 1 });
 
     // Tạo instance mới cho Customer
     const customer = new Customer({
@@ -58,12 +59,66 @@ exports.registerCustomer = async (req, res) => {
     // Lưu Customer vào database
     await customer.save();
 
-    res.status(201).json({ msg: 'Khách hàng mới đã được tạo', user, customer });
+    // Tạo token kích hoạt tài khoản
+    const activationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    // Tạo transporter để gửi email
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Nội dung email kích hoạt
+    const activationUrl = `https://host-rose-sigma.vercel.app/api/users/activate/${activationToken}`;
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Kích hoạt tài khoản của bạn',
+      html: `<p>Chào ${name},</p>
+             <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng nhấn vào liên kết dưới đây để kích hoạt tài khoản của bạn:</p>
+             <a href="${activationUrl}">Kích hoạt tài khoản</a>
+             <p>Liên kết này sẽ hết hạn sau 1 giờ.</p>`
+    };
+
+    // Gửi email
+    await transporter.sendMail(mailOptions);
+
+    res.status(201).json({ msg: 'Khách hàng mới đã được tạo. Vui lòng kiểm tra email để kích hoạt tài khoản.', user, customer });
   } catch (err) {
     console.error('Lỗi khi đăng ký khách hàng:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
+// Kích hoạt tài khoản khách hàng
+exports.activateCustomerAccount = async (req, res) => {
+  const { token } = req.params;
+
+  try {
+    // Xác minh token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
+
+    // Tìm user theo ID
+    let user = await User.findById(userId);
+    if (!user || user.is_active) {
+      return res.status(400).json({ msg: 'Tài khoản không hợp lệ hoặc đã được kích hoạt' });
+    }
+
+    // Cập nhật trạng thái tài khoản thành kích hoạt
+    user.is_active = true;
+    await user.save();
+
+    res.status(200).json({ msg: 'Tài khoản đã được kích hoạt thành công' });
+  } catch (err) {
+    console.error('Lỗi khi kích hoạt tài khoản:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
+
 // Lấy chi tiết khách hàng theo ID và bao gồm danh sách xe
 exports.getCustomerByIdWithVehicles = async (req, res) => {
   try {
@@ -170,7 +225,7 @@ exports.getCustomersAndVehiclesByVehicleType = async (req, res) => {
 
     // Tìm tất cả các khách hàng với customer_id tương ứng và không bị xóa
     const customers = await Customer.find({ _id: { $in: customerIds }, is_deleted: false }).populate('customer_rank_id')
-    .lean(); // Sử dụng lean() để dễ dàng chỉnh sửa dữ liệu sau khi truy vấn;
+      .lean(); // Sử dụng lean() để dễ dàng chỉnh sửa dữ liệu sau khi truy vấn;
 
     // Kết hợp khách hàng và xe của họ
     const customerMap = new Map();

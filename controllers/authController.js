@@ -74,13 +74,20 @@ exports.loginAdmin = async (req, res) => {
          if (!user) {
              return res.status(400).json({ msg: 'Thông tin đăng nhập không đúng' });
          }
- 
+         
          // So sánh mật khẩu
          const isMatch = await bcrypt.compare(password, user.password);
          if (!isMatch) {
              return res.status(400).json({ msg: 'Thông tin đăng nhập không đúng' });
          }
- 
+         // Kiểm tra xem tài khoan đã bị xóa hay chưa
+         if (user.is_deleted === true) {
+            return res.status(400).json({ msg: 'Tài khoản đã bị xóa' });
+         }
+         // Kiểm tra xem tài khoản đã được kích hoạt hay chưa
+         if (user.is_active === false) {
+            return res.status(400).json({ msg: 'Tài khoản chưa được kích hoạt' }); 
+         }
          // Tạo payload cho JWT
          const payload = {
              user: {

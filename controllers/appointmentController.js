@@ -21,7 +21,7 @@ exports.registerAppointmentWithServices = async (req, res) => {
     if (!slot || slot.is_deleted || slot.status !== 'available') {
       return res.status(404).json({ msg: 'Slot không khả dụng' });
     }
-
+    
     // Tạo lịch hẹn mới
     const appointment = new Appointment({
       customer_id: vehicle.customer_id,
@@ -217,7 +217,7 @@ exports.processAppointmentArrival = async (req, res) => {
     if (!appointment || appointment.is_deleted || appointment.status !== 'scheduled') {
       return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn hợp lệ' });
     }
-    
+
     // Cập nhật trạng thái lịch hẹn thành "completed"
     appointment.status = 'completed';
     await appointment.save();

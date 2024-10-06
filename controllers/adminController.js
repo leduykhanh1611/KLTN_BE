@@ -44,7 +44,32 @@ exports.registerAdmin = async (req, res) => {
         role: user.role,
       },
     };
+    // Tạo token kích hoạt tài khoản
+    const activationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
+    // Tạo transporter để gửi email
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Nội dung email kích hoạt
+    const activationUrl = `https://host-rose-sigma.vercel.app/api/users/activate/${activationToken}`;
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Kích hoạt tài khoản của bạn',
+      html: `<p>Xin Chào ${username},</p>
+             <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng nhấn vào liên kết dưới đây để kích hoạt tài khoản của bạn:</p>
+             <a href="${activationUrl}">Kích hoạt tài khoản</a>
+             <p>Liên kết này sẽ hết hạn sau 1 giờ.</p>`
+    };
+
+    // Gửi email
+    await transporter.sendMail(mailOptions);
     // Ký JWT và trả về token
     jwt.sign(
       payload,
