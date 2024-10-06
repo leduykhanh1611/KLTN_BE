@@ -112,7 +112,21 @@ exports.activateCustomerAccount = async (req, res) => {
     user.is_active = true;
     await user.save();
 
-    res.status(200).json({ msg: 'Tài khoản đã được kích hoạt thành công' });
+     // Trả về HTML trực tiếp
+     res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Kích Hoạt Thành Công</title>
+      </head>
+      <body>
+        <h1>Tài khoản của bạn đã được kích hoạt thành công!</h1>
+        <p>Bạn có thể đăng nhập vào tài khoản của mình ngay bây giờ.</p>
+      </body>
+      </html>
+    `);
   } catch (err) {
     console.error('Lỗi khi kích hoạt tài khoản:', err.message);
     res.status(500).send('Lỗi máy chủ');
