@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 require('dotenv').config();
 
 // Đăng ký Employee mới
@@ -59,32 +60,34 @@ exports.registerEmployee = async (req, res) => {
         role: user.role,
       },
     };
-    // Tạo token kích hoạt tài khoản
-    const activationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    // Tạo transporter để gửi email
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // Nội dung email kích hoạt
-    const activationUrl = `https://host-rose-sigma.vercel.app/api/users/activate/${activationToken}`;
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: 'Kích hoạt tài khoản của bạn',
-      html: `<p>Chào ${name},</p>
-             <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng nhấn vào liên kết dưới đây để kích hoạt tài khoản của bạn:</p>
-             <a href="${activationUrl}">Kích hoạt tài khoản</a>
-             <p>Liên kết này sẽ hết hạn sau 1 giờ.</p>`
-    };
-
-    // Gửi email
-    await transporter.sendMail(mailOptions);
+     // Tạo mã OTP (6 chữ số)
+     const otp = crypto.randomInt(100000, 999999);
+     user.otp = otp; // Lưu OTP vào user
+     user.otp_expiry = Date.now() + 3600000; // OTP có hiệu lực trong 1 giờ
+     await user.save();
+ 
+     // Tạo transporter để gửi email
+     const transporter = nodemailer.createTransport({
+       service: 'gmail',
+       auth: {
+         user: process.env.EMAIL_USER,
+         pass: process.env.EMAIL_PASS,
+       },
+     });
+ 
+     // Nội dung email chứa mã OTP
+     const mailOptions = {
+       from: process.env.EMAIL_USER,
+       to: email,
+       subject: 'Mã OTP kích hoạt tài khoản của bạn',
+       html: `<p>Chào ${name},</p>
+              <p>Cảm ơn bạn đã đăng ký tài khoản. Đây là mã OTP để kích hoạt tài khoản của bạn:</p>
+              <h2>${otp}</h2>
+              <p>Mã này sẽ hết hạn sau 1 giờ.</p>`,
+     };
+ 
+     // Gửi email chứa mã OTP
+     await transporter.sendMail(mailOptions);
     // Ký JWT và trả về token
     jwt.sign(
       payload,

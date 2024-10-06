@@ -2,7 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { registerCustomer, updateCustomer, softDeleteCustomer, getAllCustomers, getCustomerByIdWithVehicles, getCustomersAndVehiclesByVehicleType, activateCustomerAccount } = require('../controllers/userController');
+const { registerCustomer, updateCustomer, softDeleteCustomer, getAllCustomers, getCustomerByIdWithVehicles, getCustomersAndVehiclesByVehicleType, activateCustomerAccountWithOtp } = require('../controllers/userController');
 const { check } = require('express-validator');
 // Import middleware xác thực và phân quyền
 const auth = require('../middleware/auth');
@@ -49,5 +49,5 @@ router.get('/vehicle-type/:vehicleTypeId', auth, getCustomersAndVehiclesByVehicl
 // @route   GET /api/customers/activate-account/:id
 // @desc    Kích hoạt tài khoản khách hàng
 // @access  Không có
-router.get('/activate/:activationToken', activateCustomerAccount);
+router.post('/activate', activateCustomerAccountWithOtp);
 module.exports = router;

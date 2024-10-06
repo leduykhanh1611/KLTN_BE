@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const { validationResult } = require('express-validator');
 const path = require('path'); // Thêm import path
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 // Đăng ký khách hàng mới
 exports.registerCustomer = async (req, res) => {
@@ -58,8 +59,11 @@ exports.registerCustomer = async (req, res) => {
     // Lưu Customer vào database
     await customer.save();
 
-    // Tạo token kích hoạt tài khoản
-    const activationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // Tạo mã OTP (6 chữ số)
+    const otp = crypto.randomInt(100000, 999999);
+    user.otp = otp; // Lưu OTP vào user
+    user.otp_expiry = Date.now() + 3600000; // OTP có hiệu lực trong 1 giờ
+    await user.save();
 
     // Tạo transporter để gửi email
     const transporter = nodemailer.createTransport({
@@ -70,19 +74,18 @@ exports.registerCustomer = async (req, res) => {
       },
     });
 
-    // Nội dung email kích hoạt
-    const activationUrl = `https://host-rose-sigma.vercel.app/api/users/activate/${activationToken}`;
+    // Nội dung email chứa mã OTP
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Kích hoạt tài khoản của bạn',
+      subject: 'Mã OTP kích hoạt tài khoản của bạn',
       html: `<p>Chào ${name},</p>
-             <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng nhấn vào liên kết dưới đây để kích hoạt tài khoản của bạn:</p>
-             <a href="${activationUrl}">Kích hoạt tài khoản</a>
-             <p>Liên kết này sẽ hết hạn sau 1 giờ.</p>`
+              <p>Cảm ơn bạn đã đăng ký tài khoản. Đây là mã OTP để kích hoạt tài khoản của bạn:</p>
+              <h2>${otp}</h2>
+              <p>Mã này sẽ hết hạn sau 1 giờ.</p>`,
     };
 
-    // Gửi email
+    // Gửi email chứa mã OTP
     await transporter.sendMail(mailOptions);
 
     // Trả về trang HTML thông báo thành công
@@ -93,46 +96,39 @@ exports.registerCustomer = async (req, res) => {
   }
 };
 
-// Kích hoạt tài khoản khách hàng
-exports.activateCustomerAccount = async (req, res) => {
-  const { token } = req.params;
+// Kích hoạt tài khoản khách hàng bằng mã OTP
+exports.activateCustomerAccountWithOtp = async (req, res) => {
+  const { email, otp } = req.body;
 
   try {
-    // Xác minh token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.userId;
+    // Tìm user theo email
+    let user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ msg: 'Không tìm thấy tài khoản với email này' });
+    }
 
-    // Tìm user theo ID
-    let user = await User.findById(userId);
-    if (!user || user.is_active) {
-      return res.status(400).json({ msg: 'Tài khoản không hợp lệ hoặc đã được kích hoạt' });
+    // Kiểm tra xem tài khoản đã kích hoạt chưa
+    if (user.is_active) {
+      return res.status(400).json({ msg: 'Tài khoản đã được kích hoạt' });
+    }
+
+    // Kiểm tra mã OTP và thời hạn hiệu lực
+    if (user.otp !== parseInt(otp) || Date.now() > user.otp_expiry) {
+      return res.status(400).json({ msg: 'Mã OTP không hợp lệ hoặc đã hết hạn' });
     }
 
     // Cập nhật trạng thái tài khoản thành kích hoạt
     user.is_active = true;
+    user.otp = null; // Xóa mã OTP sau khi kích hoạt
+    user.otp_expiry = null;
     await user.save();
 
-     // Trả về HTML trực tiếp
-     res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Kích Hoạt Thành Công</title>
-      </head>
-      <body>
-        <h1>Tài khoản của bạn đã được kích hoạt thành công!</h1>
-        <p>Bạn có thể đăng nhập vào tài khoản của mình ngay bây giờ.</p>
-      </body>
-      </html>
-    `);
+    res.status(200).json({ msg: 'Tài khoản đã được kích hoạt thành công' });
   } catch (err) {
     console.error('Lỗi khi kích hoạt tài khoản:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
 // Lấy chi tiết khách hàng theo ID và bao gồm danh sách xe
 exports.getCustomerByIdWithVehicles = async (req, res) => {
   try {
