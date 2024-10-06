@@ -5,7 +5,8 @@ const {
   updateSlot,
   softDeleteSlot,
   getAllSlots,
-  getSlotById
+  getSlotById,
+  getSlotWithNearestOrCompletedAppointment
 } = require('../controllers/slotController');
 const auth = require('../middleware/auth');
 const isAdmin = require('../middleware/isAdmin');
@@ -25,6 +26,10 @@ router.put('/:slotId', [auth, isAdmin], updateSlot);
 // @access  Private (chỉ admin)
 router.delete('/:slotId', [auth, isAdmin], softDeleteSlot);
 
+// @route   GET /api/slots/:slotId
+// @desc    Lấy thông tin slot cùng lịch hẹn gần nhất hoặc lịch hẹn hoàn thành gần nhất
+// @access  Private (phải đăng nhập)
+router.get('/detail/:slotId', auth, getSlotWithNearestOrCompletedAppointment);
 // @route   GET /api/slots
 // @desc    Lấy tất cả các slot
 // @access  Public

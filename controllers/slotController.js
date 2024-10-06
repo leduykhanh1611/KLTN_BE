@@ -3,7 +3,7 @@ const AppointmentService = require('../models/AppointmentService');
 const Appointment = require('../models/Appointment');
 const Vehicle = require('../models/Vehicle');
 const Service = require('../models/Service');
-
+// Thêm slot
 exports.addSlot = async (req, res) => {
   const { slot_datetime, duration_minutes, status, capacity } = req.body;
 
@@ -24,7 +24,7 @@ exports.addSlot = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
+// cập nhật slot
 exports.updateSlot = async (req, res) => {
   const { slotId } = req.params;
   const { slot_datetime, duration_minutes, status, capacity } = req.body;
@@ -48,7 +48,7 @@ exports.updateSlot = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
+// xóa mềm slot
 exports.softDeleteSlot = async (req, res) => {
   const { slotId } = req.params;
 
@@ -67,7 +67,7 @@ exports.softDeleteSlot = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
+// lấy tất cả slot
 exports.getAllSlots = async (req, res) => {
   try {
     const slots = await Slot.find({ is_deleted: false });
@@ -77,7 +77,7 @@ exports.getAllSlots = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
+// lấy thông tin slot theo ID 
 exports.getSlotById = async (req, res) => {
   const { slotId } = req.params;
 
@@ -117,3 +117,33 @@ exports.getSlotById = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+// Lấy thông tin slot cùng lịch hẹn gần nhất hoặc lịch hẹn hoàn thành gần nhất
+exports.getSlotWithNearestOrCompletedAppointment = async (req, res) => {
+    const { slotId } = req.params;
+  
+    try {
+      const slot = await Slot.findOne({ _id: slotId, is_deleted: false });
+      if (!slot) {
+        return res.status(404).json({ msg: 'Không tìm thấy slot' });
+      }
+  
+      // Tìm lịch hẹn gần nhất với trạng thái "scheduled" hoặc "completed"
+      const appointment = await Appointment.findOne({
+        slot_id: slotId,
+        is_deleted: false,
+        status: { $in: ['scheduled', 'completed'] },
+      })
+        .sort({ appointment_datetime: 1 }) // Sắp xếp theo thời gian gần nhất
+        .populate('vehicle_id')
+        .lean();
+  
+      if (!appointment) {
+        return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn phù hợp' });
+      }
+  
+      res.json({ slot, appointment });
+    } catch (err) {
+      console.error('Lỗi khi lấy thông tin slot:', err.message);
+      res.status(500).send('Lỗi máy chủ');
+    }
+  };

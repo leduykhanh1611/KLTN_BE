@@ -5,6 +5,7 @@ const {
   getAppointmentDetailsWithTotalCost,
   cancelAppointment,
   getSlotById,
+  processAppointmentArrival
 } = require('../controllers/appointmentController');
 
 const auth = require('../middleware/auth');
@@ -29,4 +30,8 @@ router.delete('/:appointmentId', auth, cancelAppointment);
 // @access  Private (phải đăng nhập)
 router.get('/slots/:slotId', auth, getSlotById);
 
+// @route   POST /api/appointments/:appointmentId/arrive
+// @desc    Xác nhận khách hàng đã đến
+// @access  Private (phải đăng nhập)
+router.post('/:appointmentId/arrive', auth, processAppointmentArrival);
 module.exports = router;

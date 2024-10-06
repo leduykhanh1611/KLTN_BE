@@ -206,3 +206,25 @@ exports.getSlotById = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
+// Xử lý khi khách hàng đến sử dụng dịch vụ của trung tâm từ lịch hẹn
+exports.processAppointmentArrival = async (req, res) => {
+  const { appointmentId } = req.params;
+
+  try {
+    // Tìm lịch hẹn
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment || appointment.is_deleted || appointment.status !== 'scheduled') {
+      return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn hợp lệ' });
+    }
+    
+    // Cập nhật trạng thái lịch hẹn thành "completed"
+    appointment.status = 'completed';
+    await appointment.save();
+
+    res.json({ msg: 'Khách hàng đã đến và sử dụng dịch vụ thành công', appointment });
+  } catch (err) {
+    console.error('Lỗi khi xử lý khách hàng đến:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
