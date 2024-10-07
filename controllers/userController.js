@@ -55,13 +55,13 @@ exports.registerCustomer = async (req, res) => {
     });
 
     // Lưu Customer vào database
-   
+    await customer.save();
 
     // Tạo mã OTP (6 chữ số)
     const otp = crypto.randomInt(100000, 999999);
     user.otp = otp; // Lưu OTP vào user
     user.otp_expiry = Date.now() + 3600000; // OTP có hiệu lực trong 1 giờ
-    
+    await user.save();
 
     // Tạo transporter để gửi email
     const transporter = nodemailer.createTransport({
@@ -85,8 +85,7 @@ exports.registerCustomer = async (req, res) => {
 
     // Gửi email chứa mã OTP
     await transporter.sendMail(mailOptions);
-    await customer.save();
-    await user.save();
+
     res.status(201).json({ msg: 'Khách hàng mới đã được tạo', user, customer });
   } catch (err) {
     console.error('Lỗi khi đăng ký khách hàng:', err.message);
