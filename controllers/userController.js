@@ -38,9 +38,7 @@ exports.registerCustomer = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(password, salt);
 
-    // Lưu User vào database
-    await user.save();
-
+    
     // Lấy hạng khách hàng có min_spending thấp nhất
     const lowestRank = await CustomerRank.findOne({ is_deleted: false }).sort({ min_spending: 1 });
 
@@ -57,13 +55,13 @@ exports.registerCustomer = async (req, res) => {
     });
 
     // Lưu Customer vào database
-    await customer.save();
+   
 
     // Tạo mã OTP (6 chữ số)
     const otp = crypto.randomInt(100000, 999999);
     user.otp = otp; // Lưu OTP vào user
     user.otp_expiry = Date.now() + 3600000; // OTP có hiệu lực trong 1 giờ
-    await user.save();
+    
 
     // Tạo transporter để gửi email
     const transporter = nodemailer.createTransport({
@@ -87,7 +85,8 @@ exports.registerCustomer = async (req, res) => {
 
     // Gửi email chứa mã OTP
     await transporter.sendMail(mailOptions);
-    
+    await customer.save();
+    await user.save();
     res.status(201).json({ msg: 'Khách hàng mới đã được tạo', user, customer });
   } catch (err) {
     console.error('Lỗi khi đăng ký khách hàng:', err.message);
