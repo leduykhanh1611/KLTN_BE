@@ -87,9 +87,8 @@ exports.registerCustomer = async (req, res) => {
 
     // Gửi email chứa mã OTP
     await transporter.sendMail(mailOptions);
-
-    // Trả về trang HTML thông báo thành công
-    res.sendFile(path.join(__dirname, '../public/success.html'));
+    
+    res.status(201).json({ msg: 'Khách hàng mới đã được tạo', user, customer });
   } catch (err) {
     console.error('Lỗi khi đăng ký khách hàng:', err.message);
     res.status(500).send('Lỗi máy chủ');
