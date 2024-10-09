@@ -32,7 +32,7 @@ exports.createPaymentLink = async (req, res) => {
   
       // Tạo liên kết thanh toán bằng PayOS
       const paymentBody = {
-        orderCode: 12345,
+        orderCode: Math.floor(100000 + Math.random() * 900000),
         amount: 12345,
         description: 'Thanh toán hóa đơn',
         items: [
