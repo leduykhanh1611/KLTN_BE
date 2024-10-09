@@ -18,30 +18,28 @@ exports.createPaymentLink = async (req, res) => {
     const { invoiceId } = req.params;
   
     try {
-      // Tìm hóa đơn theo ID
-    //   const invoice = await Invoice.findById(invoiceId).populate('customer_id');
-    //   if (!invoice || invoice.is_deleted || invoice.status !== 'pending') {
-    //     return res.status(404).json({ msg: 'Không tìm thấy hóa đơn hợp lệ' });
-    //   }
+    //   Tìm hóa đơn theo ID
+      const invoice = await Invoice.findById(invoiceId);
+      if (!invoice || invoice.is_deleted || invoice.status !== 'pending') {
+        return res.status(404).json({ msg: 'Không tìm thấy hóa đơn hợp lệ' });
+      }
   
-    //   // Lấy chi tiết hóa đơn
-    //   const invoiceDetails = await InvoiceDetail.find({
-    //     invoice_id: invoiceId,
-    //     is_deleted: false,
-    //   }).populate('service_id');
+      // Lấy chi tiết hóa đơn
+      const invoiceDetails = await InvoiceDetail.find({
+        invoice_id: invoiceId,
+        is_deleted: false,
+      }).populate('service_id');
   
       // Tạo liên kết thanh toán bằng PayOS
       const paymentBody = {
         orderCode: Math.floor(100000 + Math.random() * 900000),
-        amount: 12345,
-        description: 'Thanh toán hóa đơn',
-        items: [
-            {
-              name: "Mi tom hao hao",
-              quantity: 1,
-              price: 2000,
-            },
-          ],
+        amount: invoiceId,
+        description: invoice.id,
+        items: invoiceDetails.map(detail => ({
+            name: detail.service_id.name,
+            quantity: detail.quantity,
+            price: detail.price,
+        })),
         cancelUrl: 'http://localhost:3000/cancel.html',
         returnUrl: 'http://localhost:3000/success.html',
       };
