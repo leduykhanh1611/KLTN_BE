@@ -9,13 +9,16 @@ const PayOS = require('@payos/node');
 const Payment = require('../models/Payment');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
+const path = require('path');
+const Cus = require('../models/Customer');
+const employee = require('../models/Employee');
 
 const payOS = new PayOS(
     process.env.PAYOS_CLIENT_ID,
     process.env.PAYOS_API_KEY,
     process.env.PAYOS_CHECKSUM_KEY
-  );
-  
+);
+
 // Tạo liên kết thanh toán cho khách hàng
 exports.createPaymentLink = async (req, res) => {
     const { invoiceId } = req.params;
@@ -234,6 +237,11 @@ exports.handlePaymentWebhook = async (req, res) => {
                 invoice.status = 'paid';
                 await invoice.save();
             }
+            const user = await Cus.findById(invoice.customer_id);
+            if (user) {
+                user.total_spending += invoice.final_amount;
+                await user.save();
+            }
         } else {
             const invoice = await Invoice.findById(payment.invoice_id);
             if (invoice) {
@@ -248,17 +256,18 @@ exports.handlePaymentWebhook = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
+
 // Lấy thông tin hóa đơn và in ra bản PDF
 exports.getInvoiceAndGeneratePDF = async (req, res) => {
     const { invoiceId } = req.params;
 
     try {
         // Tìm hóa đơn theo ID
-        const invoice = await Invoice.findById(invoiceId);
+        const invoice = await Invoice.findById(invoiceId).populate('customer_id');
         if (!invoice || invoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
         }
-
+        const emp = await employee.findById(invoice.employee_id);
         // Lấy chi tiết hóa đơn
         const invoiceDetails = await InvoiceDetail.find({
             invoice_id: invoiceId,
@@ -267,8 +276,21 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
 
         // Tạo PDF hóa đơn
         const doc = new PDFDocument();
-        const filePath = `./invoices/invoice_${invoiceId}.pdf`;
-        doc.pipe(fs.createWriteStream(filePath));
+        const buffers = [];
+
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => {
+            const pdfData = Buffer.concat(buffers);
+            res.set({
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `attachment; filename=invoice_${invoiceId}.pdf`,
+            });
+            res.send(pdfData);
+        });
+
+        // Đường dẫn tới file font hỗ trợ tiếng Việt
+        const fontPath = path.join(__dirname, '../fonts/Roboto-Regular.ttf');
+        doc.font(fontPath);
 
         // Thông tin tiêu đề hóa đơn
         doc.fontSize(20).text('Hóa đơn thanh toán', { align: 'center' });
@@ -278,6 +300,8 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
         doc.fontSize(12).text(`Tên khách hàng: ${invoice.customer_id.name}`);
         doc.text(`Email: ${invoice.customer_id.email}`);
         doc.text(`Ngày xuất hóa đơn: ${new Date().toLocaleDateString()}`);
+        doc.text(`Nhân viên: ${emp.name}`);
+
         doc.moveDown();
 
         // Thông tin chi tiết hóa đơn
@@ -295,8 +319,6 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
 
         // Kết thúc và lưu file PDF
         doc.end();
-
-        res.status(200).json({ msg: 'Hóa đơn đã được tạo và lưu thành công', filePath });
     } catch (err) {
         console.error('Lỗi khi tạo PDF hóa đơn:', err.message);
         res.status(500).send('Lỗi máy chủ');
