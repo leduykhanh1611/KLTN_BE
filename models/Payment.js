@@ -7,26 +7,55 @@ const PaymentSchema = new mongoose.Schema(
       ref: 'Invoice',
       required: true,
     },
-    payment_method: {
-      type: String,
-      required: true,
-      enum: ['cash', 'credit_card', 'paypal', 'other'], // Adjust as necessary
-    },
-    payment_date: {
-      type: Date,
-      required: true,
-      default: Date.now,
-    },
-    amount_paid: {
+    order_code: {
       type: Number,
       required: true,
     },
-    payment_status: {
+    amount: {
+      type: Number,
+      required: true,
+    },
+    description: {
       type: String,
       required: true,
-      enum: ['pending', 'completed', 'failed'], // Adjust as necessary
     },
-    transaction_id: String,
+    account_number: String,
+    reference: String,
+    transaction_date_time: {
+      type: Date,
+      required: true,
+    },
+    currency: {
+      type: String,
+      default: 'VND',
+    },
+    payment_link_id: String,
+    code: String,
+    desc: String,
+    counter_account_bank_id: {
+      type: String,
+      default: null,
+    },
+    counter_account_bank_name: {
+      type: String,
+      default: null,
+    },
+    counter_account_name: {
+      type: String,
+      default: null,
+    },
+    counter_account_number: {
+      type: String,
+      default: null,
+    },
+    virtual_account_name: {
+      type: String,
+      default: null,
+    },
+    virtual_account_number: {
+      type: String,
+      default: null,
+    },
     is_deleted: {
       type: Boolean,
       default: false,
