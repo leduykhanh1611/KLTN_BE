@@ -51,7 +51,7 @@ exports.createPaymentLink = async (req, res) => {
       res.status(200).json({ msg: 'Liên kết thanh toán đã được tạo thành công', paymentLink: paymentLinkRes });
     } catch (err) {
       console.error('Lỗi khi tạo liên kết thanh toán:', err.message);
-      res.status(500).send('Lỗi máy chủ: ', err.message);
+      res.status(500).send('Lỗi máy chủ'+err.message);
     }
   };
   
