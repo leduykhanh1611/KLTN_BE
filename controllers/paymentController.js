@@ -5,44 +5,56 @@ const Invoice = require('../models/Invoice');
 const InvoiceDetail = require('../models/InvoiceDetail');
 const PromotionHeader = require('../models/PromotionHeader');
 const CustomerRank = require('../models/CustomerRank');
-const payOS = require('payos-sdk'); // Assuming payOS is the SDK for creating payment links
-
+const PayOS = require('@payos/node');
 
 // Khởi tạo PayOS với thông tin xác thực
 const payOS = new PayOS(
-    process.env.PAYOS_CLIENT_ID,
-    process.env.PAYOS_API_KEY,
-    process.env.PAYOS_CHECKSUM_KEY
-  );
+  process.env.PAYOS_CLIENT_ID,
+  process.env.PAYOS_API_KEY,
+  process.env.PAYOS_CHECKSUM_KEY
+);
 // Tạo liên kết thanh toán cho khách hàng
 exports.createPaymentLink = async (req, res) => {
-
-  try {
-    // Tạo liên kết thanh toán bằng PayOS
-    const paymentBody = {
-      orderCode: 1234,
-      amount: 2000,
-      description: 'Thanh toán hóa đơn dịch vụ',
-      items: [
-        {
-          name: "Mi tom hao hao",
-          quantity: 1,
-          price: 2000,
-        },
-      ],
-      cancelUrl: 'http://localhost:3000/cancel.html',
-      returnUrl: 'http://localhost:3000/success.html',
-    };
-
-    const paymentLinkRes = await payOS.createPaymentLink(paymentBody);
-
-    res.status(200).json({ msg: 'Liên kết thanh toán đã được tạo thành công', paymentLink: paymentLinkRes });
-  } catch (err) {
-    console.error('Lỗi khi tạo liên kết thanh toán:', err.message);
-    res.status(500).send('Lỗi máy chủ');
-  }
-};
-
+    const { invoiceId } = req.params;
+  
+    try {
+      // Tìm hóa đơn theo ID
+    //   const invoice = await Invoice.findById(invoiceId).populate('customer_id');
+    //   if (!invoice || invoice.is_deleted || invoice.status !== 'pending') {
+    //     return res.status(404).json({ msg: 'Không tìm thấy hóa đơn hợp lệ' });
+    //   }
+  
+    //   // Lấy chi tiết hóa đơn
+    //   const invoiceDetails = await InvoiceDetail.find({
+    //     invoice_id: invoiceId,
+    //     is_deleted: false,
+    //   }).populate('service_id');
+  
+      // Tạo liên kết thanh toán bằng PayOS
+      const paymentBody = {
+        orderCode: 12345,
+        amount: 12345,
+        description: 'Thanh toán hóa đơn',
+        items: [
+            {
+              name: "Mi tom hao hao",
+              quantity: 1,
+              price: 2000,
+            },
+          ],
+        cancelUrl: 'http://localhost:3000/cancel.html',
+        returnUrl: 'http://localhost:3000/success.html',
+      };
+  
+      const paymentLinkRes = await payOS.createPaymentLink(paymentBody);
+  
+      res.status(200).json({ msg: 'Liên kết thanh toán đã được tạo thành công', paymentLink: paymentLinkRes });
+    } catch (err) {
+      console.error('Lỗi khi tạo liên kết thanh toán:', err.message);
+      res.status(500).send('Lỗi máy chủ');
+    }
+  };
+  
 // Xuất hóa đơn thanh toán cho khách hàng
 exports.generateInvoice = async (req, res) => {
     const { appointmentId } = req.params;
