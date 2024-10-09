@@ -28,6 +28,7 @@ app.use("/api/promotions", require("./routes/promotions"));
 app.use('/api/customers-rank', require('./routes/customers_rank'));
 app.use('/api/slots', require('./routes/slotRoutes'));
 app.use('/api/appointments', require('./routes/appointmentRoutes'));
+app.use('/api/payments', require('./routes/paymentRoutes'));
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
