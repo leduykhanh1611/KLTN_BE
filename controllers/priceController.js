@@ -90,6 +90,7 @@ exports.softDeletePriceHeader = async (req, res) => {
         }
 
         // Đánh dấu bảng giá đã bị xóa
+        priceHeader.is_active = false;
         priceHeader.is_deleted = true;
         priceHeader.updated_at = Date.now();
 
