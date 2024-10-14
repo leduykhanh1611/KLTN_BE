@@ -7,9 +7,9 @@ const AppointmentServiceSchema = new mongoose.Schema(
       ref: 'Appointment',
       required: true,
     },
-    service_id: {
+    price_line_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Service',
+      ref: 'PriceLine',
       required: true,
     },
     is_deleted: {

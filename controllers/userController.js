@@ -139,7 +139,7 @@ exports.getCustomerByIdWithVehicles = async (req, res) => {
     }
 
     // Tìm tất cả các xe liên quan đến khách hàng này
-    const vehicles = await Vehicle.find({ customer_id: req.params.id, is_deleted: false });
+    const vehicles = await Vehicle.find({ customer_id: req.params.id, is_deleted: false }).populate('vehicle_type_id');
 
     // Trả về thông tin khách hàng kèm danh sách xe
     res.json({
@@ -260,6 +260,35 @@ exports.getCustomersAndVehiclesByVehicleType = async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Lỗi khi lấy danh sách khách hàng và xe:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
+
+// tìm khách hàng theo số điện thoại và email
+exports.findCustomerByPhoneOrEmail = async (req, res) => {
+  const { phone_number, email } = req.query;
+  try {
+    // Tìm khách hàng theo số điện thoại hoặc email
+    const customer = await Customer.findOne({
+      $or: [{ phone_number }, { email }],
+      is_deleted: false
+    }).populate('customer_rank_id')
+      .lean(); // Sử dụng lean() để dễ dàng chỉnh sửa dữ liệu sau khi truy vấn;
+
+    if (!customer) {
+      return res.status(404).json({ msg: 'Không tìm thấy khách hàng' });
+    }
+
+    // Tìm tất cả các xe liên quan đến khách hàng này
+    const vehicles = await Vehicle.find({ customer_id: customer._id, is_deleted: false }).populate('vehicle_type_id');
+
+    // Trả về thông tin khách hàng và danh sách xe
+    res.status(200).json({
+      customer,
+      vehicles,
+    });
+  } catch (err) {
+    console.error('Lỗi khi tìm khách hàng:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };

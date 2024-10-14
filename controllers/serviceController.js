@@ -1,8 +1,10 @@
 const Service = require('../models/Service');
+const PriceHeader = require('../models/PriceHeader');
+const PriceLine = require('../models/PriceLine');
 
 // Thêm dịch vụ mới
 exports.addService = async (req, res) => {
-    const { service_code, name, description } = req.body;
+    const { service_code, name, description, time_required } = req.body;
 
     try {
         // Kiểm tra xem service_code đã tồn tại chưa
@@ -16,6 +18,7 @@ exports.addService = async (req, res) => {
             service_code,
             name,
             description,
+            time_required,
             is_deleted: false,
             updated_at: Date.now()
         });
@@ -60,7 +63,7 @@ exports.getServiceById = async (req, res) => {
 };
 // Cập nhật dịch vụ
 exports.updateService = async (req, res) => {
-    const { service_code, name, description } = req.body;
+    const { service_code, name, description, time_required } = req.body;
     const { serviceId } = req.params;
 
     try {
@@ -74,6 +77,7 @@ exports.updateService = async (req, res) => {
         if (service_code) service.service_code = service_code;
         if (name) service.name = name;
         if (description) service.description = description;
+        if (time_required) service.time_required = time_required;
 
         service.updated_at = Date.now();
 
@@ -95,7 +99,10 @@ exports.softDeleteService = async (req, res) => {
         if (!service || service.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy dịch vụ' });
         }
-
+        let priceHeader = await PriceHeader.findOne({ service_id: serviceId, is_deleted: false, is_active: true });
+        if (priceHeader) {
+            return res.status(400).json({ msg: 'Dịch vụ này đang được sử dụng trong bảng giá: '+priceHeader.price_list_name });
+        }
         // Đánh dấu dịch vụ đã bị xóa
         service.is_deleted = true;
         service.updated_at = Date.now();

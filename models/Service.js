@@ -12,6 +12,10 @@ const ServiceSchema = new mongoose.Schema(
       required: true,
     },
     description: String,
+    time_required: {
+      type: Number,
+      required: true,
+    },
     is_deleted: {
       type: Boolean,
       default: false,

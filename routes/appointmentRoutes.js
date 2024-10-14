@@ -5,7 +5,8 @@ const {
   getAppointmentDetailsWithTotalCost,
   cancelAppointment,
   getSlotById,
-  processAppointmentArrival
+  processAppointmentArrival,
+  filterAppointmentsByDate
 } = require('../controllers/appointmentController');
 
 const auth = require('../middleware/auth');
@@ -14,6 +15,11 @@ const auth = require('../middleware/auth');
 // @desc    Đăng ký lịch hẹn với nhiều dịch vụ
 // @access  Private (phải đăng nhập)
 router.post('/', auth, registerAppointmentWithServices);
+
+// @route   GET /api/appointments
+// @desc    Lấy danh sách lịch hẹn theo ngày
+// @access  Private (phải đăng nhập)
+router.get('/', auth, filterAppointmentsByDate);
 
 // @route   GET /api/appointments/:appointmentId
 // @desc    Lấy thông tin lịch hẹn cùng các dịch vụ liên quan và tổng phí

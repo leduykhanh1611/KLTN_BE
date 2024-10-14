@@ -8,7 +8,7 @@ const PriceHeader = require('../models/PriceHeader');
 const Customer = require('../models/Customer');
 // Đăng ký lịch hẹn với nhiều dịch vụ
 exports.registerAppointmentWithServices = async (req, res) => {
-  const {  slot_id, vehicle_id, service_ids, start_time, end_time } = req.body;
+  const { slot_id, vehicle_id, service_ids, appointment_datetime } = req.body;
 
   try {
     // Kiểm tra xem xe có tồn tại không
@@ -16,20 +16,22 @@ exports.registerAppointmentWithServices = async (req, res) => {
     if (!vehicle || vehicle.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy xe' });
     }
+
     // Kiểm tra xem slot có tồn tại và khả dụng không
     const slot = await Slot.findById(slot_id);
     if (!slot || slot.is_deleted || slot.status !== 'available') {
       return res.status(404).json({ msg: 'Slot không khả dụng' });
+    } else {
+      // Cập nhật trạng thái slot thành "booked"
+      slot.status = 'booked';
+      await slot.save();
     }
-    
     // Tạo lịch hẹn mới
     const appointment = new Appointment({
       customer_id: vehicle.customer_id,
-      slot_id,
       vehicle_id,
-      start_time,
-      end_time,
-      appointment_datetime: start_time,
+      slot_id,
+      appointment_datetime,
       status: 'scheduled',
       is_deleted: false,
     });
@@ -38,23 +40,25 @@ exports.registerAppointmentWithServices = async (req, res) => {
 
     // Thêm các dịch vụ vào lịch hẹn
     for (let service_id of service_ids) {
-      const service = await Service.findById(service_id);
-      if (!service || service.is_deleted) {
-        continue; // Bỏ qua nếu dịch vụ không tồn tại hoặc đã bị xóa
+      // Tìm giá của dịch vụ dựa trên loại xe và dịch vụ được chọn
+      const priceLine = await PriceLine.findOne({
+        service_id: service_id,
+        vehicle_type_id: vehicle.vehicle_type_id,
+        is_deleted: false,
+      });
+
+      if (!priceLine) {
+        return res.status(400).json({ msg: `Không tìm thấy giá cho dịch vụ ${service_id}` });
       }
 
       const appointmentService = new AppointmentService({
         appointment_id: appointment._id,
-        service_id,
+        price_line_id: priceLine._id,
         is_deleted: false,
       });
 
       await appointmentService.save();
     }
-
-    // Cập nhật trạng thái slot thành "booked"
-    slot.status = 'booked';
-    await slot.save();
 
     res.status(201).json({ msg: 'Đăng ký lịch hẹn thành công', appointment });
   } catch (err) {
@@ -62,6 +66,7 @@ exports.registerAppointmentWithServices = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
 
 // Lấy thông tin lịch hẹn cùng các dịch vụ liên quan và tổng phí
 exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
@@ -80,23 +85,16 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
 
     // Lấy danh sách dịch vụ của lịch hẹn
     const appointmentServices = await AppointmentService.find({ appointment_id: appointmentId, is_deleted: false })
-      .populate('service_id')
+      .populate({
+        path: 'price_line_id',
+        populate: {
+          path: 'service_id vehicle_type_id',
+        }
+      })
       .lean();
 
     if (appointmentServices.length === 0) {
       return res.status(404).json({ msg: 'Không tìm thấy dịch vụ cho lịch hẹn này' });
-    }
-
-    // Lấy thông tin xe để xác định loại xe
-    const vehicle = appointment.vehicle_id;
-    if (!vehicle) {
-      return res.status(404).json({ msg: 'Không tìm thấy xe cho lịch hẹn này' });
-    }
-
-    // Lấy bảng giá chưa bị xóa mềm
-    const priceHeader = await PriceHeader.findOne({ is_deleted: false, is_active: true });
-    if (!priceHeader) {
-      return res.status(404).json({ msg: 'Không tìm thấy bảng giá hợp lệ' });
     }
 
     // Tính tổng phí và thêm thông tin dịch vụ vào đối tượng lịch hẹn
@@ -104,28 +102,17 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
     const services = [];
 
     for (let appService of appointmentServices) {
-      const service = appService.service_id;
-
-      // Tìm giá từ bảng PriceLine dựa trên service_id và vehicle_type_id
-      const priceLine = await PriceLine.findOne({
-        service_id: service._id,
-        vehicle_type_id: vehicle.vehicle_type_id,
-        price_header_id: priceHeader._id,
-        is_deleted: false,
-      });
-
-      if (!priceLine) {
-        return res.status(404).json({ msg: `Không tìm thấy giá cho dịch vụ ${service.name}` });
-      }
+      const service = appService.price_line_id.service_id;
+      const price = appService.price_line_id.price;
 
       // Cộng giá dịch vụ vào tổng phí
-      totalCost += priceLine.price;
+      totalCost += price;
 
       services.push({
         _id: service._id,
         name: service.name,
         description: service.description,
-        price: priceLine.price,
+        price: price,
       });
     }
 
@@ -140,6 +127,7 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
   }
 };
 
+
 // Hủy lịch hẹn (xóa mềm)
 exports.cancelAppointment = async (req, res) => {
   const { appointmentId } = req.params;
@@ -149,7 +137,13 @@ exports.cancelAppointment = async (req, res) => {
     if (!appointment || appointment.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn' });
     }
+
+    if (appointment.status !== 'completed' && appointment.status !== 'cancelled') {
+      return  res.status(400).json({ msg: 'Không thể hủy lịch hẹn này' });
+    }
+
     appointment.status = 'cancelled';
+    appointment.is_deleted = true;
     await appointment.save();
 
     // Cập nhật trạng thái slot thành "available" nếu lịch hẹn bị hủy
@@ -165,6 +159,7 @@ exports.cancelAppointment = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
 
 // Lấy thông tin slot cùng các lịch hẹn và dịch vụ liên quan
 exports.getSlotById = async (req, res) => {
@@ -182,7 +177,12 @@ exports.getSlotById = async (req, res) => {
       .lean();
 
     const appointmentServices = await AppointmentService.find({ appointment_id: { $in: appointments.map(a => a._id) }, is_deleted: false })
-      .populate('service_id')
+      .populate({
+        path: 'price_line_id',
+        populate: {
+          path: 'service_id',
+        }
+      })
       .lean();
 
     const servicesByAppointment = {};
@@ -190,7 +190,7 @@ exports.getSlotById = async (req, res) => {
       if (!servicesByAppointment[appService.appointment_id]) {
         servicesByAppointment[appService.appointment_id] = [];
       }
-      servicesByAppointment[appService.appointment_id].push(appService.service_id);
+      servicesByAppointment[appService.appointment_id].push(appService.price_line_id.service_id);
     }
 
     const appointmentsWithServices = appointments.map(appointment => {
@@ -206,6 +206,7 @@ exports.getSlotById = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
 
 // Xử lý khi khách hàng đến sử dụng dịch vụ của trung tâm từ lịch hẹn
 exports.processAppointmentArrival = async (req, res) => {
@@ -225,6 +226,51 @@ exports.processAppointmentArrival = async (req, res) => {
     res.json({ msg: 'Khách hàng đã đến và sử dụng dịch vụ thành công', appointment });
   } catch (err) {
     console.error('Lỗi khi xử lý khách hàng đến:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
+
+// Lọc lịch hẹn theo ngày
+exports.filterAppointmentsByDate = async (req, res) => {
+  const { date, status } = req.query;
+
+  try {
+    // Kiểm tra nếu không có ngày được truyền vào
+    if (!date) {
+      return res.status(400).json({ msg: 'Vui lòng cung cấp ngày để lọc lịch hẹn' });
+    }
+
+    // Tạo thời gian bắt đầu và kết thúc cho ngày cần tìm kiếm
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Tạo query cho trạng thái nếu có
+    let statusFilter = {};
+    if (status) {
+      statusFilter = { status };
+    }
+
+    // Tìm các lịch hẹn theo ngày
+    const appointments = await Appointment.find({
+      appointment_datetime: { $gte: startOfDay, $lte: endOfDay },
+      is_deleted: false,
+      ...statusFilter,
+    })
+      .populate('customer_id')
+      .populate('vehicle_id')
+      .populate('slot_id')
+      .lean();
+
+    if (appointments.length === 0) {
+      return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn nào trong ngày này' });
+    }
+
+    res.json(appointments);
+  } catch (err) {
+    console.error('Lỗi khi lọc lịch hẹn theo ngày:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };
