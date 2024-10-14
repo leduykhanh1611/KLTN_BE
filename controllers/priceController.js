@@ -179,6 +179,7 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
     }
 
     res.status(200).json(priceLines.map(priceLine => ({
+      priceline_id: priceLine._id,
       service: priceLine.service_id.name,
       vehicle_type: priceLine.vehicle_type_id.vehicle_type_name,
       price: priceLine.price,
