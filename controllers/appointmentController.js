@@ -66,8 +66,6 @@ exports.registerAppointmentWithServices = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
-
 // Lấy thông tin lịch hẹn cùng các dịch vụ liên quan và tổng phí
 exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
   const { appointmentId } = req.params;
@@ -86,7 +84,6 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
     // Lấy danh sách dịch vụ của lịch hẹn
     const appointmentServices = await AppointmentService.find({ appointment_id: appointmentId, is_deleted: false })
       .populate('price_line_id').lean();
-      console.log(appointmentServices);
     if (appointmentServices.length === 0) {
       return res.status(404).json({ msg: 'Không tìm thấy dịch vụ cho lịch hẹn này' });
     }
@@ -120,8 +117,6 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
-
 // Hủy lịch hẹn (xóa mềm)
 exports.cancelAppointment = async (req, res) => {
   const { appointmentId } = req.params;
@@ -153,8 +148,6 @@ exports.cancelAppointment = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
-
 // Lấy thông tin slot cùng các lịch hẹn và dịch vụ liên quan
 exports.getSlotById = async (req, res) => {
   const { slotId } = req.params;
@@ -200,8 +193,6 @@ exports.getSlotById = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
-
 // Xử lý khi khách hàng đến sử dụng dịch vụ của trung tâm từ lịch hẹn
 exports.processAppointmentArrival = async (req, res) => {
   const { appointmentId } = req.params;
@@ -287,6 +278,79 @@ exports.getCompletedAppointments = async (req, res) => {
     res.json(appointments);
   } catch (err) {
     console.error('Lỗi khi lấy lịch hẹn đã hoàn thành:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
+
+// Cập nhật lịch hẹn và các dịch vụ liên quan
+exports.updateAppointment = async (req, res) => {
+  const { appointmentId } = req.params;
+  const { slot_id, appointment_datetime, service_ids } = req.body;
+
+  try {
+    // Tìm lịch hẹn theo ID
+    const appointment = await Appointment.findById(appointmentId);
+    if (!appointment || appointment.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn' });
+    }
+
+    // Cập nhật thông tin slot nếu cần
+    if (slot_id && slot_id !== appointment.slot_id.toString()) {
+      // Kiểm tra xem slot mới có tồn tại và khả dụng không
+      const newSlot = await Slot.findById(slot_id);
+      if (!newSlot || newSlot.is_deleted || newSlot.status !== 'available') {
+        return res.status(404).json({ msg: 'Slot không khả dụng' });
+      }
+
+      // Đánh dấu slot cũ là khả dụng
+      const oldSlot = await Slot.findById(appointment.slot_id);
+      if (oldSlot) {
+        oldSlot.status = 'available';
+        await oldSlot.save();
+      }
+
+      // Cập nhật slot mới thành "booked"
+      newSlot.status = 'booked';
+      await newSlot.save();
+
+      // Cập nhật slot trong lịch hẹn
+      appointment.slot_id = slot_id;
+    }
+
+    // Cập nhật thời gian lịch hẹn nếu có
+    if (appointment_datetime) {
+      appointment.appointment_datetime = appointment_datetime;
+    }
+
+    // Cập nhật danh sách dịch vụ nếu có
+    if (service_ids && service_ids.length > 0) {
+      // Xóa mềm tất cả các dịch vụ hiện tại của lịch hẹn
+      await AppointmentService.updateMany({ appointment_id: appointmentId }, { is_deleted: true });
+
+      // Thêm các dịch vụ mới vào lịch hẹn
+      for (let service_id of service_ids) {
+        // Tìm giá của dịch vụ dựa trên loại xe và dịch vụ được chọn
+        const priceLine = await PriceLine.findById(service_id);
+
+        if (!priceLine) {
+          return res.status(400).json({ msg: `Không tìm thấy giá cho dịch vụ ${service_id}` });
+        }
+
+        const appointmentService = new AppointmentService({
+          appointment_id: appointment._id,
+          price_line_id: priceLine._id,
+          is_deleted: false,
+        });
+
+        await appointmentService.save();
+      }
+    }
+    // Lưu lịch hẹn đã cập nhật
+    await appointment.save();
+
+    res.status(200).json({ msg: 'Cập nhật lịch hẹn thành công', appointment });
+  } catch (err) {
+    console.error('Lỗi khi cập nhật lịch hẹn:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };
