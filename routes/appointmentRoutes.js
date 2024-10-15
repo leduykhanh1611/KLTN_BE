@@ -6,7 +6,8 @@ const {
   cancelAppointment,
   getSlotById,
   processAppointmentArrival,
-  filterAppointmentsByDate
+  filterAppointmentsByDate,
+  getCompletedAppointments
 } = require('../controllers/appointmentController');
 
 const auth = require('../middleware/auth');
@@ -40,4 +41,10 @@ router.get('/slots/:slotId', auth, getSlotById);
 // @desc    Xác nhận khách hàng đã đến
 // @access  Private (phải đăng nhập)
 router.post('/:appointmentId/arrive', auth, processAppointmentArrival);
+
+// @route   GET /api/appointments/completed
+// @desc    Lấy danh sách lịch hẹn đã hoàn thành
+// @access  Private (phải đăng nhập)
+router.get('/get/completed', auth, getCompletedAppointments);
+
 module.exports = router;

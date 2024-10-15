@@ -113,11 +113,7 @@ exports.generateInvoice = async (req, res) => {
 
         for (let appService of appointmentServices) {
             // Tìm giá của dịch vụ tương ứng với loại xe trong lịch hẹn
-            const priceLine = await PriceLine.findOne({
-                service_id: appService.service_id._id,
-                vehicle_type_id: appointment.vehicle_id.vehicle_type_id,
-                is_deleted: false,
-            });
+            const priceLine = await PriceLine.findById(appService.price_line_id);
 
             if (!priceLine) {
                 return res.status(400).json({ msg: `Không tìm thấy bảng giá cho dịch vụ: ${appService.service_id.name}` });

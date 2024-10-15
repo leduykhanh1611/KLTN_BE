@@ -85,14 +85,8 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
 
     // Lấy danh sách dịch vụ của lịch hẹn
     const appointmentServices = await AppointmentService.find({ appointment_id: appointmentId, is_deleted: false })
-      .populate({
-        path: 'price_line_id',
-        populate: {
-          path: 'service_id vehicle_type_id',
-        }
-      })
-      .lean();
-
+      .populate('price_line_id').lean();
+      console.log(appointmentServices);
     if (appointmentServices.length === 0) {
       return res.status(404).json({ msg: 'Không tìm thấy dịch vụ cho lịch hẹn này' });
     }
@@ -102,7 +96,7 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
     const services = [];
 
     for (let appService of appointmentServices) {
-      const service = appService.price_line_id.service_id;
+      const service = await Service.findById(appService.price_line_id.service_id);
       const price = appService.price_line_id.price;
 
       // Cộng giá dịch vụ vào tổng phí
@@ -139,7 +133,7 @@ exports.cancelAppointment = async (req, res) => {
     }
 
     if (appointment.status !== 'completed' && appointment.status !== 'cancelled') {
-      return  res.status(400).json({ msg: 'Không thể hủy lịch hẹn này' });
+      return res.status(400).json({ msg: 'Không thể hủy lịch hẹn này' });
     }
 
     appointment.status = 'cancelled';
@@ -218,10 +212,12 @@ exports.processAppointmentArrival = async (req, res) => {
     if (!appointment || appointment.is_deleted || appointment.status !== 'scheduled') {
       return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn hợp lệ' });
     }
-
     // Cập nhật trạng thái lịch hẹn thành "completed"
     appointment.status = 'completed';
     await appointment.save();
+    const slot = await Slot.findById(appointment.slot_id);
+    slot.status = 'available';
+    await slot.save();
 
     res.json({ msg: 'Khách hàng đã đến và sử dụng dịch vụ thành công', appointment });
   } catch (err) {
@@ -271,6 +267,26 @@ exports.filterAppointmentsByDate = async (req, res) => {
     res.json(appointments);
   } catch (err) {
     console.error('Lỗi khi lọc lịch hẹn theo ngày:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
+
+// lấy lịch hẹn đã hoàn thành
+exports.getCompletedAppointments = async (req, res) => {
+  try {
+    const appointments = await Appointment.find({ status: 'completed', is_deleted: false })
+      .populate('customer_id')
+      .populate('vehicle_id')
+      .populate('slot_id')
+      .lean();
+
+    if (appointments.length === 0) {
+      return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn nào đã hoàn thành' });
+    }
+
+    res.json(appointments);
+  } catch (err) {
+    console.error('Lỗi khi lấy lịch hẹn đã hoàn thành:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };
