@@ -101,7 +101,7 @@ exports.generateInvoice = async (req, res) => {
         const appointmentServices = await AppointmentService.find({
             appointment_id: appointmentId,
             is_deleted: false,
-        }).populate('service_id');
+        });
 
         if (appointmentServices.length === 0) {
             return res.status(400).json({ msg: 'Không có dịch vụ nào liên quan đến lịch hẹn' });
@@ -133,7 +133,7 @@ exports.generateInvoice = async (req, res) => {
         let discountAmount = 0;
         let fixedDiscount = 0;
         let percentageDiscount = 0;
-        let promotionHeader = null;
+        let promotionHeader = [];
 
         // Kiểm tra các chương trình khuyến mãi áp dụng cho khách hàng
         const activePromotions = await PromotionHeader.find({
@@ -150,13 +150,13 @@ exports.generateInvoice = async (req, res) => {
                 if (promotion.discount_type === 'fixed' && promotion.discount_value <= totalAmount) {
                     if (promotion.discount_value > fixedDiscount) {
                         fixedDiscount = promotion.discount_value;
-                        promotionHeader = promotion;
+                        promotionHeader.push(promotion._id);
                     }
                 } else if (promotion.discount_type === 'percentage') {
                     const calculatedPercentageDiscount = totalAmount * (promotion.discount_value / 100);
                     if (calculatedPercentageDiscount > percentageDiscount) {
                         percentageDiscount = calculatedPercentageDiscount;
-                        promotionHeader = promotion;
+                        promotionHeader.push(promotion._id);
                     }
                 }
             }
@@ -173,7 +173,7 @@ exports.generateInvoice = async (req, res) => {
             customer_id: appointment.customer_id,
             employee_id: employeeId, // Sẽ cập nhật sau nếu cần
             appointment_id: appointmentId,
-            promotion_header_id: promotionHeader ? promotionHeader._id : null, // Gán khuyến mãi nếu có
+            promotion_header_id: promotionHeader.length > 0 ? promotionHeader : null, // Gán khuyến mãi nếu có
             total_amount: totalAmount,
             discount_amount: discountAmount,
             final_amount: finalAmount,
@@ -259,7 +259,7 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
 
     try {
         // Tìm hóa đơn theo ID
-        const invoice = await Invoice.findById(invoiceId).populate('customer_id');
+        const invoice = await Invoice.findById(invoiceId).populate('customer_id promotion_header_id ');
         if (!invoice || invoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
         }
@@ -311,6 +311,13 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             doc.moveDown();
         });
 
+        doc.moveDown();
+
+        invoice.promotion_header_id.forEach(promotion => {
+            doc.text(`Khuyến mãi: ${promotion.name}`);
+            doc.text(`Nội dung: ${promotion.description}`);
+        });
+        doc.moveDown();
         // Tổng tiền
         doc.text(`Tổng tiền: ${invoice.total_amount} VND`);
         doc.text(`Giảm giá: ${invoice.discount_amount} VND`);
