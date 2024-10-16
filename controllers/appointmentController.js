@@ -51,11 +51,7 @@ exports.registerAppointmentWithServices = async (req, res) => {
     // Thêm các dịch vụ vào lịch hẹn
     for (let service_id of service_ids) {
       // Tìm giá của dịch vụ dựa trên loại xe và dịch vụ được chọn
-      const priceLine = await PriceLine.findOne({
-        service_id: service_id,
-        vehicle_type_id: vehicle.vehicle_type_id,
-        is_deleted: false,
-      });
+      const priceLine = await PriceLine.findById(service_id);
 
       if (!priceLine) {
         return res.status(400).json({ msg: `Không tìm thấy giá cho dịch vụ ${service_id}` });
