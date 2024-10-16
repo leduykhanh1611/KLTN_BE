@@ -10,6 +10,16 @@ const Customer = require('../models/Customer');
 exports.registerAppointmentWithServices = async (req, res) => {
   const { slot_id, vehicle_id, service_ids, appointment_datetime } = req.body;
 
+
+  if (!service_ids ) {
+    return res.status(400).json({ msg: 'Vui lòng cung cấp đầy đủ thông tin dịch vụ' });
+  }
+  if (!appointment_datetime) {
+    return res.status(400).json({ msg: 'Vui lòng cung cấp đầy đủ thời gian lịch hẹn' });
+  }
+  if (!vehicle_id) {
+    return res.status(400).json({ msg: 'Vui lòng cung cấp thông tin về xe' });
+  }
   try {
     // Kiểm tra xem xe có tồn tại không
     const vehicle = await Vehicle.findById(vehicle_id);
