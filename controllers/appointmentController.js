@@ -10,7 +10,8 @@ const Customer = require('../models/Customer');
 exports.registerAppointmentWithServices = async (req, res) => {
   const { slot_id, vehicle_id, service_ids, appointment_datetime } = req.body;
 
-
+  const sumtime = new Date(appointment_datetime);
+  const sum = 0; 
   if (!service_ids ) {
     return res.status(400).json({ msg: 'Vui lòng cung cấp đầy đủ thông tin dịch vụ' });
   }
@@ -51,12 +52,12 @@ exports.registerAppointmentWithServices = async (req, res) => {
     // Thêm các dịch vụ vào lịch hẹn
     for (let service_id of service_ids) {
       // Tìm giá của dịch vụ dựa trên loại xe và dịch vụ được chọn
-      const priceLine = await PriceLine.findById(service_id);
+      const priceLine = await PriceLine.findById(service_id).populate('service_id');
 
       if (!priceLine) {
         return res.status(400).json({ msg: `Không tìm thấy giá cho dịch vụ ${service_id}` });
       }
-
+      sum += priceLine.service_id.time_required;
       const appointmentService = new AppointmentService({
         appointment_id: appointment._id,
         price_line_id: priceLine._id,
@@ -64,8 +65,12 @@ exports.registerAppointmentWithServices = async (req, res) => {
       });
 
       await appointmentService.save();
-    }
 
+
+    }
+    slot.time_required = sum;
+    slot.slot_datetime = appointment_datetime.AddMinutes(sum);
+    await slot.save();
     res.status(201).json({ msg: 'Đăng ký lịch hẹn thành công', appointment });
   } catch (err) {
     console.error('Lỗi khi đăng ký lịch hẹn:', err.message);
