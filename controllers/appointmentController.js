@@ -84,7 +84,7 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
   try {
     // Tìm lịch hẹn
     const appointment = await Appointment.findOne({ _id: appointmentId, is_deleted: false })
-      .populate('vehicle_id')
+      .populate('vehicle_id customer_id')
       .populate('slot_id')
       .lean();
 
