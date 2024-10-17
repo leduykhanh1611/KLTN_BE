@@ -21,7 +21,6 @@ const InvoiceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'PromotionHeader',
       default: null,
-      Array: true,
     },
     total_amount: {
       type: Number,

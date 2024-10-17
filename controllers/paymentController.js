@@ -101,7 +101,7 @@ exports.generateInvoice = async (req, res) => {
         const appointmentServices = await AppointmentService.find({
             appointment_id: appointmentId,
             is_deleted: false,
-        });
+        }).populate('price_line_id');
 
         if (appointmentServices.length === 0) {
             return res.status(400).json({ msg: 'Không có dịch vụ nào liên quan đến lịch hẹn' });
@@ -113,7 +113,7 @@ exports.generateInvoice = async (req, res) => {
 
         for (let appService of appointmentServices) {
             // Tìm giá của dịch vụ tương ứng với loại xe trong lịch hẹn
-            const priceLine = await PriceLine.findById(appService.price_line_id);
+            const priceLine = await PriceLine.findById(appService.price_line_id).populate('service_id');
 
             if (!priceLine) {
                 return res.status(400).json({ msg: `Không tìm thấy bảng giá cho dịch vụ: ${appService.service_id.name}` });
@@ -123,7 +123,7 @@ exports.generateInvoice = async (req, res) => {
 
             // Thêm chi tiết hóa đơn
             invoiceDetails.push({
-                service_id: appService.service_id._id,
+                service_id: priceLine.service_id._id,
                 price: priceLine.price,
                 quantity: 1,
             });
@@ -173,7 +173,7 @@ exports.generateInvoice = async (req, res) => {
             customer_id: appointment.customer_id,
             employee_id: employeeId, // Sẽ cập nhật sau nếu cần
             appointment_id: appointmentId,
-            promotion_header_id: promotionHeader.length > 0 ? promotionHeader : null, // Gán khuyến mãi nếu có
+            promotion_header_id: promotionHeader.length != 0 ? promotionHeader : null, // Gán khuyến mãi nếu có
             total_amount: totalAmount,
             discount_amount: discountAmount,
             final_amount: finalAmount,
@@ -259,7 +259,7 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
 
     try {
         // Tìm hóa đơn theo ID
-        const invoice = await Invoice.findById(invoiceId).populate('customer_id promotion_header_id ');
+        const invoice = await Invoice.findById(invoiceId).populate('customer_id promotion_header_id')
         if (!invoice || invoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
         }
