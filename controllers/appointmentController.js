@@ -10,8 +10,8 @@ const Customer = require('../models/Customer');
 exports.registerAppointmentWithServices = async (req, res) => {
   const { slot_id, vehicle_id, service_ids, appointment_datetime } = req.body;
 
-  const sumtime = new Date(appointment_datetime);
-  const sum = 0; 
+  var sum = 0; 
+  
   if (!service_ids ) {
     return res.status(400).json({ msg: 'Vui lòng cung cấp đầy đủ thông tin dịch vụ' });
   }
@@ -69,7 +69,7 @@ exports.registerAppointmentWithServices = async (req, res) => {
 
     }
     slot.time_required = sum;
-    slot.slot_datetime = appointment_datetime.AddMinutes(sum);
+    slot.slot_datetime = appointment_datetime;
     await slot.save();
     res.status(201).json({ msg: 'Đăng ký lịch hẹn thành công', appointment });
   } catch (err) {
