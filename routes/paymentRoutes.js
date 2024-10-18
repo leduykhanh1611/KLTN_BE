@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF } = require('../controllers/paymentController');
+const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF, getInvoice } = require('../controllers/paymentController');
 const auth = require('../middleware/auth');
 
 // @route   POST /api/payments/generate-invoice/:appointmentId
@@ -17,6 +17,11 @@ router.post('/create-payment-link/:invoiceId', createPaymentLink);
 // @desc    Xử lý webhook trả về kết quả thanh toán
 // @access  Public
 router.post('/webhook', handlePaymentWebhook);
+
+// @route   GET /api/payments/invoice/:invoiceId
+// @desc    Lấy thông tin hóa đơn
+// @access  Private (phải đăng nhập)
+router.get('/invoice/:invoiceId', auth, getInvoice);
 
 // @route   GET /api/payments/invoice/:invoiceId/pdf
 // @desc    Lấy thông tin hóa đơn và in ra bản PDF

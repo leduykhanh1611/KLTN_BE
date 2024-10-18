@@ -6,6 +6,7 @@ const Service = require('../models/Service');
 const PriceLine = require('../models/PriceLine');
 const PriceHeader = require('../models/PriceHeader');
 const Customer = require('../models/Customer');
+const Invoice = require('../models/Invoice');
 // Đăng ký lịch hẹn với nhiều dịch vụ
 exports.registerAppointmentWithServices = async (req, res) => {
   const { slot_id, vehicle_id, service_ids, appointment_datetime } = req.body;
@@ -273,9 +274,10 @@ exports.filterAppointmentsByDate = async (req, res) => {
   }
 };
 
-// lấy lịch hẹn đã hoàn thành
+// Lấy lịch hẹn đã hoàn thành, nếu lịch hẹn nào đã lên hóa đơn thì lấy thêm cả thông tin hóa đơn
 exports.getCompletedAppointments = async (req, res) => {
   try {
+    // Lấy tất cả các lịch hẹn có trạng thái "completed"
     const appointments = await Appointment.find({ status: 'completed', is_deleted: false })
       .populate('customer_id')
       .populate('vehicle_id')
@@ -286,13 +288,30 @@ exports.getCompletedAppointments = async (req, res) => {
       return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn nào đã hoàn thành' });
     }
 
-    res.json(appointments);
+    // Tìm hóa đơn liên quan đến các lịch hẹn
+    const appointmentIds = appointments.map(appointment => appointment._id);
+    const invoices = await Invoice.find({ appointment_id: { $in: appointmentIds }, is_deleted: false }).lean();
+
+    // Tạo map để ánh xạ hóa đơn với lịch hẹn
+    const invoiceMap = {};
+    invoices.forEach(invoice => {
+      invoiceMap[invoice.appointment_id.toString()] = invoice;
+    });
+
+    // Thêm thông tin hóa đơn vào đối tượng lịch hẹn (nếu có)
+    const appointmentsWithInvoices = appointments.map(appointment => {
+      return {
+        ...appointment,
+        invoice: invoiceMap[appointment._id.toString()] || null, // Nếu không có hóa đơn, đặt giá trị là null
+      };
+    });
+
+    res.json(appointmentsWithInvoices);
   } catch (err) {
     console.error('Lỗi khi lấy lịch hẹn đã hoàn thành:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
 // Cập nhật lịch hẹn và các dịch vụ liên quan
 exports.updateAppointment = async (req, res) => {
   const { appointmentId } = req.params;

@@ -263,7 +263,7 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
         if (!invoice || invoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
         }
-        if(invoice.status !== 'paid') {
+        if (invoice.status !== 'paid') {
             return res.status(400).json({ msg: 'Hóa đơn chưa được thanh toán' });
         }
         const emp = await employee.findById(invoice.employee_id);
@@ -327,6 +327,30 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
         doc.end();
     } catch (err) {
         console.error('Lỗi khi tạo PDF hóa đơn:', err.message);
+        res.status(500).send('Lỗi máy chủ');
+    }
+};
+
+// lấy thông tin hóa đơn
+exports.getInvoice = async (req, res) => {
+    const { invoiceId } = req.params;
+
+    try {
+        // Tìm hóa đơn theo ID
+        const invoice = await Invoice.findById(invoiceId).populate('customer_id promotion_header_id')
+        if (!invoice || invoice.is_deleted) {
+            return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
+        }
+
+        // Lấy chi tiết hóa đơn
+        const invoiceDetails = await InvoiceDetail.find({
+            invoice_id: invoiceId,
+            is_deleted: false,
+        }).populate('service_id');
+
+        res.status(200).json({ invoice, invoiceDetails });
+    } catch (err) {
+        console.error('Lỗi khi lấy thông tin hóa đơn:', err.message);
         res.status(500).send('Lỗi máy chủ');
     }
 };
