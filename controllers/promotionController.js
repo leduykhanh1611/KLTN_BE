@@ -3,7 +3,7 @@
 const PromotionHeader = require('../models/PromotionHeader');
 const PromotionLine = require('../models/PromotionLine');
 const PromotionDetail = require('../models/PromotionDetail');
-// Thêm chương trình khuyến mãi mới
+// Thêm chương trình khuyến mãi mới 
 exports.addPromotionHeader = async (req, res) => {
     const { promotion_code, name, description } = req.body;
 
@@ -32,7 +32,6 @@ exports.addPromotionHeader = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
-
 // Thêm chi tiết khuyến mãi vào chương trình khuyến mãi
 exports.addPromotionLine = async (req, res) => {
     const { discount_type, start_date, end_date, description } = req.body;
@@ -59,7 +58,6 @@ exports.addPromotionLine = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
-
 // Thêm chi tiết khuyến mãi cho dòng khuyến mãi
 exports.addPromotionDetail = async (req, res) => {
     const { promotionLineId } = req.params;
@@ -82,7 +80,7 @@ exports.addPromotionDetail = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
-
+//dùng cái này
 // Lấy tất cả hearder chương trình khuyến mãi
 exports.getAllPromotions = async (req, res) => {
     try {
@@ -429,7 +427,7 @@ exports.softDeletePromotionDetail = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
-
+// dùng cái này
 // Lấy thông tin chương trình khuyến mãi với các line và detail
 exports.getPromotionWithDetails = async (req, res) => {
     const { promotionHeaderId } = req.params;
