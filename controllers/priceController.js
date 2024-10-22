@@ -4,135 +4,135 @@ const Service = require('../models/Service');
 const VehicleType = require('../models/VehicleType');
 // Thêm bảng giá mới
 exports.addPriceHeader = async (req, res) => {
-    const { price_list_name, start_date, end_date } = req.body;
+  const { price_list_name, start_date, end_date } = req.body;
 
-    try {
-        // Tạo mới bảng giá
-        const priceHeader = new PriceHeader({
-            price_list_name,
-            start_date,
-            end_date,
-            is_active: true,
-            is_deleted: false,
-            updated_at: Date.now()
-        });
+  try {
+    // Tạo mới bảng giá
+    const priceHeader = new PriceHeader({
+      price_list_name,
+      start_date,
+      end_date,
+      is_active: true,
+      is_deleted: false,
+      updated_at: Date.now()
+    });
 
-        // Lưu vào cơ sở dữ liệu
-        await priceHeader.save();
+    // Lưu vào cơ sở dữ liệu
+    await priceHeader.save();
 
-        res.status(201).json({ msg: 'Bảng giá mới đã được thêm', priceHeader });
-    } catch (err) {
-        console.error('Lỗi khi thêm bảng giá:', err.message);
-        res.status(500).send('Lỗi máy chủ');
-    }
+    res.status(201).json({ msg: 'Bảng giá mới đã được thêm', priceHeader });
+  } catch (err) {
+    console.error('Lỗi khi thêm bảng giá:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
 };
 // Thêm dòng chi tiết giá cho bảng giá
 exports.addPriceLine = async (req, res) => {
-    const { service_id, vehicle_type_id, price } = req.body;
-    const { priceHeaderId } = req.params;
+  const { service_id, vehicle_type_id, price } = req.body;
+  const { priceHeaderId } = req.params;
 
-    try {
-        // Tạo mới dòng chi tiết giá
-        const priceLine = new PriceLine({
-            price_header_id: priceHeaderId,
-            service_id,
-            vehicle_type_id,
-            price,
-            is_deleted: false,
-            updated_at: Date.now()
-        });
+  try {
+    // Tạo mới dòng chi tiết giá
+    const priceLine = new PriceLine({
+      price_header_id: priceHeaderId,
+      service_id,
+      vehicle_type_id,
+      price,
+      is_deleted: false,
+      updated_at: Date.now()
+    });
 
-        // Lưu vào cơ sở dữ liệu
-        await priceLine.save();
+    // Lưu vào cơ sở dữ liệu
+    await priceLine.save();
 
-        res.status(201).json({ msg: 'Chi tiết giá đã được thêm vào bảng giá', priceLine });
-    } catch (err) {
-        console.error('Lỗi khi thêm chi tiết giá:', err.message);
-        res.status(500).send('Lỗi máy chủ');
-    }
+    res.status(201).json({ msg: 'Chi tiết giá đã được thêm vào bảng giá', priceLine });
+  } catch (err) {
+    console.error('Lỗi khi thêm chi tiết giá:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
 };
 // Lấy tất cả bảng giá
 exports.getAllPriceHeaders = async (req, res) => {
-    try {
-        // Tìm tất cả các bảng giá không bị xóa
-        const priceHeaders = await PriceHeader.find({ is_deleted: false });
+  try {
+    // Tìm tất cả các bảng giá không bị xóa
+    const priceHeaders = await PriceHeader.find({ is_deleted: false });
 
-        res.json(priceHeaders);
-    } catch (err) {
-        console.error('Lỗi khi lấy danh sách bảng giá:', err.message);
-        res.status(500).send('Lỗi máy chủ');
-    }
+    res.json(priceHeaders);
+  } catch (err) {
+    console.error('Lỗi khi lấy danh sách bảng giá:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
 };
 // Lấy tất cả chi tiết giá theo bảng giá
 exports.getPriceLinesByHeader = async (req, res) => {
-    const { priceHeaderId } = req.params;
+  const { priceHeaderId } = req.params;
 
-    try {
-        // Tìm tất cả các dòng chi tiết giá của bảng giá không bị xóa
-        const priceLines = await PriceLine.find({
-            price_header_id: priceHeaderId,
-            is_deleted: false
-        }).populate('service_id vehicle_type_id');
+  try {
+    // Tìm tất cả các dòng chi tiết giá của bảng giá không bị xóa
+    const priceLines = await PriceLine.find({
+      price_header_id: priceHeaderId,
+      is_deleted: false
+    }).populate('service_id vehicle_type_id');
 
-        res.json(priceLines);
-    } catch (err) {
-        console.error('Lỗi khi lấy chi tiết giá:', err.message);
-        res.status(500).send('Lỗi máy chủ');
-    }
+    res.json(priceLines);
+  } catch (err) {
+    console.error('Lỗi khi lấy chi tiết giá:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
 };
 // Xóa mềm bảng giá
 exports.softDeletePriceHeader = async (req, res) => {
-    const { priceHeaderId } = req.params;
+  const { priceHeaderId } = req.params;
 
-    try {
-        // Tìm bảng giá theo ID
-        let priceHeader = await PriceHeader.findById(priceHeaderId);
-        if (!priceHeader || priceHeader.is_deleted) {
-            return res.status(404).json({ msg: 'Không tìm thấy bảng giá' });
-        }
-        if (priceHeader.start_date <= Date.now() && priceHeader.end_date >= Date.now()) {
-            priceHeader.is_active = false;
-            priceHeader.updated_at = Date.now();
-            priceHeader.end_date = Date.now();
-            priceHeader.is_deleted = true;
-            await priceHeader.save();
-        } else {
-            // Đánh dấu bảng giá đã bị xóa
-            priceHeader.is_active = false;
-            priceHeader.is_deleted = true;
-            priceHeader.updated_at = Date.now();
-
-            await priceHeader.save();
-        }
-        // Lấy tất cả các dòng chi tiết giá của bảng giá để xóa mềm
-        let priceLines = await PriceLine.find({ price_header_id: priceHeaderId, is_deleted: false });
-        // Đánh dấu các dòng chi tiết giá đã bị xóa
-        for (let priceLine of priceLines) {
-            priceLine.is_deleted = true;
-            priceLine.updated_at = Date.now();
-            await priceLine.save();
-        }
-
-        res.json({ msg: 'Bảng giá đã được xóa', priceHeader });
-    } catch (err) {
-        console.error('Lỗi khi xóa bảng giá:', err.message);
-        res.status(500).send('Lỗi máy chủ');
+  try {
+    // Tìm bảng giá theo ID
+    let priceHeader = await PriceHeader.findById(priceHeaderId);
+    if (!priceHeader || priceHeader.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy bảng giá' });
     }
+    if (priceHeader.start_date <= Date.now() && priceHeader.end_date >= Date.now()) {
+      priceHeader.is_active = false;
+      priceHeader.updated_at = Date.now();
+      priceHeader.end_date = Date.now();
+      priceHeader.is_deleted = true;
+      await priceHeader.save();
+    } else {
+      // Đánh dấu bảng giá đã bị xóa
+      priceHeader.is_active = false;
+      priceHeader.is_deleted = true;
+      priceHeader.updated_at = Date.now();
+
+      await priceHeader.save();
+    }
+    // Lấy tất cả các dòng chi tiết giá của bảng giá để xóa mềm
+    let priceLines = await PriceLine.find({ price_header_id: priceHeaderId, is_deleted: false });
+    // Đánh dấu các dòng chi tiết giá đã bị xóa
+    for (let priceLine of priceLines) {
+      priceLine.is_deleted = true;
+      priceLine.updated_at = Date.now();
+      await priceLine.save();
+    }
+
+    res.json({ msg: 'Bảng giá đã được xóa', priceHeader });
+  } catch (err) {
+    console.error('Lỗi khi xóa bảng giá:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
 };
 // API để lấy giá của dịch vụ theo tên dịch vụ và loại xe (tìm kiếm gần đúng)
 exports.getPriceByServiceAndVehicle = async (req, res) => {
   const { serviceName, vehicleTypeName } = req.query;
-
+  let service = null;
+  let vehicleType = null;
   try {
-    let service = null;
-    let vehicleType = null;
-
     // Tìm dịch vụ theo tên gần đúng nếu có
     if (serviceName) {
       service = await Service.findOne({
-        name: { $regex: serviceName, $options: 'i' }, // Tìm kiếm gần đúng, không phân biệt hoa thường
+        name: { $regex: serviceName, $options: 'i' }, // 'i' để tìm kiếm không phân biệt chữ hoa chữ thường
         is_deleted: false,
       });
+      console.log(service);
+      console.log("-----------------");
       // if (!service) {
       //   return res.status(404).json({ msg: 'Không tìm thấy dịch vụ' });
       // }
@@ -141,9 +141,10 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
     // Tìm loại xe theo tên gần đúng nếu có
     if (vehicleTypeName) {
       vehicleType = await VehicleType.findOne({
-        name: { $regex: vehicleTypeName, $options: 'i' }, // Tìm kiếm gần đúng, không phân biệt hoa thường
+        vehicle_type_name: { $regex: vehicleTypeName, $options: 'i' }, // Tìm kiếm gần đúng, không phân biệt hoa thường
         is_deleted: false,
       });
+      console.log(vehicleType);
       // if (!vehicleType) {
       //   return res.status(404).json({ msg: 'Không tìm thấy loại xe' });
       // }
@@ -186,6 +187,31 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
     })));
   } catch (err) {
     console.error('Lỗi khi lấy giá của dịch vụ:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
+
+// Cập nhật thông tin bảng giá
+exports.updatePriceHeader = async (req, res) => {
+  const { priceHeaderId } = req.params;
+  const { price_list_name, start_date, end_date } = req.body;
+
+  try {
+    let priceHeader = await PriceHeader.findById(priceHeaderId);
+    if (!priceHeader || priceHeader.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy bảng giá' });
+    }
+
+    if (price_list_name) priceHeader.price_list_name = price_list_name;
+    if (start_date) priceHeader.start_date = start_date;
+    if (end_date) priceHeader.end_date = end_date;
+
+    priceHeader.updated_at = Date.now();
+    await priceHeader.save();
+
+    res.json({ msg: 'Bảng giá đã được cập nhật', priceHeader });
+  } catch (err) {
+    console.error('Lỗi khi cập nhật bảng giá:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };
