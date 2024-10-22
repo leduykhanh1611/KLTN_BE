@@ -11,10 +11,9 @@ const PromotionHeaderSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    description: String,
-    applicable_rank_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'CustomerRank',
+    description: {
+      type: String,
+      default: true,
     },
     is_active: {
       type: Boolean,
@@ -23,6 +22,14 @@ const PromotionHeaderSchema = new mongoose.Schema(
     is_deleted: {
       type: Boolean,
       default: false,
+    },
+    start_date: {
+      type: Date,
+      required: true,
+    },
+    end_date: {
+      type: Date,
+      required: true,
     },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }

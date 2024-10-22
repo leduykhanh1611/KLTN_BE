@@ -7,15 +7,22 @@ const PromotionDetailSchema = new mongoose.Schema(
       ref: 'PromotionLine',
       required: true,
     },
-    vehicle_type_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'VehicleType',
-      default: null,
-    },
     service_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Service',
       default: null,
+    },
+    applicable_rank_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CustomerRank',
+    },
+    discount_value: {
+      type: Number,
+    },
+    min_order_value: Number,
+    is_active: {
+      type: Boolean,
+      default: true,
     },
     is_deleted: {
       type: Boolean,

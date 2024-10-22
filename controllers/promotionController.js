@@ -5,7 +5,7 @@ const PromotionLine = require('../models/PromotionLine');
 const PromotionDetail = require('../models/PromotionDetail');
 // Thêm chương trình khuyến mãi mới
 exports.addPromotionHeader = async (req, res) => {
-    const { promotion_code, name, description, applicable_rank_id } = req.body;
+    const { promotion_code, name, description } = req.body;
 
     try {
         // Kiểm tra xem mã khuyến mãi đã tồn tại chưa
@@ -19,9 +19,7 @@ exports.addPromotionHeader = async (req, res) => {
             promotion_code,
             name,
             description,
-            applicable_rank_id,
-            is_active: true,
-            is_deleted: false,
+            created_at: Date.now(),
             updated_at: Date.now()
         });
 
@@ -37,7 +35,7 @@ exports.addPromotionHeader = async (req, res) => {
 
 // Thêm chi tiết khuyến mãi vào chương trình khuyến mãi
 exports.addPromotionLine = async (req, res) => {
-    const { discount_type, discount_value, min_order_value, start_date, end_date } = req.body;
+    const { discount_type, start_date, end_date, description } = req.body;
     const { promotionHeaderId } = req.params;
 
     try {
@@ -45,8 +43,7 @@ exports.addPromotionLine = async (req, res) => {
         const promotionLine = new PromotionLine({
             promotion_header_id: promotionHeaderId,
             discount_type,
-            discount_value,
-            min_order_value,
+            description,
             start_date,
             end_date,
             is_deleted: false,
@@ -66,14 +63,16 @@ exports.addPromotionLine = async (req, res) => {
 // Thêm chi tiết khuyến mãi cho dòng khuyến mãi
 exports.addPromotionDetail = async (req, res) => {
     const { promotionLineId } = req.params;
-    const { vehicle_type_id, service_id } = req.body;
+    const { vehicle_type_id, service_id, applicable_rank_id, discount_value, min_order_value } = req.body;
 
     try {
         const promotionDetail = new PromotionDetail({
             promotion_line_id: promotionLineId,
             vehicle_type_id,
             service_id,
-            is_deleted: false,
+            applicable_rank_id,
+            discount_value,
+            min_order_value,
         });
 
         await promotionDetail.save();
@@ -84,11 +83,11 @@ exports.addPromotionDetail = async (req, res) => {
     }
 };
 
-// Lấy tất cả chương trình khuyến mãi
+// Lấy tất cả hearder chương trình khuyến mãi
 exports.getAllPromotions = async (req, res) => {
     try {
         // Tìm tất cả các chương trình khuyến mãi không bị xóa
-        const promotions = await PromotionHeader.find({ is_deleted: false });
+        const promotions = await PromotionHeader.find({ is_deleted: false  });
 
         res.json(promotions);
     } catch (err) {
@@ -97,7 +96,7 @@ exports.getAllPromotions = async (req, res) => {
     }
 };
 
-// Lấy tất cả chi tiết khuyến mãi theo chương trình khuyến mãi
+// Lấy tất cả line khuyến mãi theo chương trình khuyến mãi
 exports.getPromotionLinesByHeader = async (req, res) => {
     const { promotionHeaderId } = req.params;
 
@@ -139,10 +138,10 @@ exports.softDeletePromotionHeader = async (req, res) => {
     }
 };
 
-// Cập nhật thông tin chương trình khuyến mãi
+// Cập nhật thông tin hearder chương trình khuyến mãi
 exports.updatePromotionHeader = async (req, res) => {
     const { promotionHeaderId } = req.params;
-    const { name, description, applicable_rank_id, is_active } = req.body;
+    const { name, description, is_active, start_date, end_date } = req.body;
 
     try {
         let promotionHeader = await PromotionHeader.findById(promotionHeaderId);
@@ -152,8 +151,9 @@ exports.updatePromotionHeader = async (req, res) => {
 
         if (name) promotionHeader.name = name;
         if (description) promotionHeader.description = description;
-        if (applicable_rank_id) promotionHeader.applicable_rank_id = applicable_rank_id;
-        if (is_active !== undefined) promotionHeader.is_active = is_active;
+        if (is_active) promotionHeader.is_active = is_active;
+        if (start_date) promotionHeader.start_date = start_date;
+        if (end_date) promotionHeader.end_date = end_date;
 
         promotionHeader.updated_at = Date.now();
         await promotionHeader.save();
@@ -168,7 +168,7 @@ exports.updatePromotionHeader = async (req, res) => {
 // Cập nhật thông tin chi tiết dòng khuyến mãi
 exports.updatePromotionLine = async (req, res) => {
     const { promotionLineId } = req.params;
-    const { discount_type, discount_value, min_order_value, start_date, end_date } = req.body;
+    const { discount_type, description, is_active, start_date, end_date } = req.body;
 
     try {
         let promotionLine = await PromotionLine.findById(promotionLineId);
@@ -177,15 +177,15 @@ exports.updatePromotionLine = async (req, res) => {
         }
 
         if (discount_type) promotionLine.discount_type = discount_type;
-        if (discount_value) promotionLine.discount_value = discount_value;
-        if (min_order_value !== undefined) promotionLine.min_order_value = min_order_value;
+        if (description) promotionLine.description = description;
+        if (is_active) promotionLine.is_active = is_active;
         if (start_date) promotionLine.start_date = start_date;
         if (end_date) promotionLine.end_date = end_date;
 
         promotionLine.updated_at = Date.now();
         await promotionLine.save();
 
-        res.json({ msg: 'Cập nhật dòng khuyến mãi thành công', promotionLine });
+        res.json({ msg: 'Cập nhật khuyến mãi thành công', promotionLine });
     } catch (err) {
         console.error('Lỗi khi cập nhật dòng khuyến mãi:', err.message);
         res.status(500).send('Lỗi máy chủ');
@@ -216,9 +216,7 @@ exports.getPromotionDetailsByLine = async (req, res) => {
     const { promotionLineId } = req.params;
 
     try {
-        const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotionLineId, is_deleted: false })
-            .populate('vehicle_type_id')
-            .populate('service_id');
+        const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotionLineId, is_deleted: false }).populate('applicable_rank_id service_id');
 
         res.json(promotionDetails);
     } catch (err) {
@@ -379,7 +377,7 @@ exports.getCustomersByPromotion = async (req, res) => {
 // Cập nhật chi tiết khuyến mãi
 exports.updatePromotionDetail = async (req, res) => {
     const { promotionDetailId } = req.params;
-    const { vehicle_type_id, service_id } = req.body;
+    const { applicable_rank_id, service_id, discount_value, min_order_value, is_active  } = req.body;
 
     try {
         // Tìm chi tiết khuyến mãi theo ID
@@ -389,8 +387,11 @@ exports.updatePromotionDetail = async (req, res) => {
         }
 
         // Cập nhật thông tin nếu có
-        if (vehicle_type_id) promotionDetail.vehicle_type_id = vehicle_type_id;
+        if (applicable_rank_id) promotionDetail.applicable_rank_id = applicable_rank_id;
         if (service_id) promotionDetail.service_id = service_id;
+        if (discount_value) promotionDetail.discount_value = discount_value;
+        if (min_order_value) promotionDetail.min_order_value = min_order_value;
+        if (is_active !== undefined) promotionDetail.is_active = is_active;
 
         promotionDetail.updated_at = Date.now();
 

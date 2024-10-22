@@ -8,20 +8,26 @@ const PromotionLineSchema = new mongoose.Schema(
       required: true,
     },
     discount_type: {
-      type: String,
-      required: true,
-      enum: ['percentage', 'fixed'], // Adjust types as necessary Giảm giá theo phần trăm và giảm giá cố định
-    },
-    discount_value: {
       type: Number,
       required: true,
+      enum: [ 1, 2], // Adjust types as necessary Giảm giá theo phần trăm và giảm giá cố định ['percentage', 'fixed']
     },
-    min_order_value: Number,
+    description: {
+      type: String,
+      default: true,
+    },
     start_date: {
       type: Date,
       required: true,
     },
-    end_date: Date,
+    end_date: {
+      type: Date,
+      required: true,
+    },
+    is_active: {
+      type: Boolean,
+      default: true,
+    },
     is_deleted: {
       type: Boolean,
       default: false,
