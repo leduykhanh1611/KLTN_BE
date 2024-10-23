@@ -46,7 +46,15 @@ exports.addPromotionHeader = async (req, res) => {
 exports.addPromotionLine = async (req, res) => {
     const { discount_type, start_date, end_date, description } = req.body;
     const { promotionHeaderId } = req.params;
-
+    if(start_date >= end_date){
+        return res.status(400).json({ msg: 'Ngày kết thuc phải sau ngày bắt đầu' });
+    }
+    if(start_date <= Date.now()){
+        return res.status(400).json({ msg: 'Ngày bắt đầu phải sau ngày hiện tại' });
+    }
+    if(end_date <= Date.now()){
+        return res.status(400).json({ msg: 'Ngày kết thúc phải sau ngày hiện tại' });
+    }
     try {
         // Tạo mới dòng chi tiết khuyến mãi
         const promotionLine = new PromotionLine({
