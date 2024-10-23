@@ -11,7 +11,10 @@ const PriceHeaderSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
-    end_date: Date,
+    end_date: {
+      type: Date,
+      required: true,
+    },
     is_active: {
       type: Boolean,
       default: true,

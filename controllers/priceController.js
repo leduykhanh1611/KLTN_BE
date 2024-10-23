@@ -7,6 +7,16 @@ exports.addPriceHeader = async (req, res) => {
   const { price_list_name, start_date, end_date } = req.body;
 
   try {
+
+    if (start_date >= end_date) {
+      return res.status(400).json({ msg: 'Ngày kết thúc phải sau ngày bắt đầu' });  
+    }
+    if (start_date <= Date.now()) {
+      return res.status(400).json({ msg: 'Ngày bắt đầu phải sau ngày hiện tại' });
+    }
+    if (end_date <= Date.now()) {
+      return res.status(400).json({ msg: 'Ngày kết thúc phải sau ngày hiện tại' });
+    }
     // Tạo mới bảng giá
     const priceHeader = new PriceHeader({
       price_list_name,
@@ -30,8 +40,11 @@ exports.addPriceHeader = async (req, res) => {
 exports.addPriceLine = async (req, res) => {
   const { service_id, vehicle_type_id, price } = req.body;
   const { priceHeaderId } = req.params;
-
+  
   try {
+    if (price <= 0) {
+      return res.status(400).json({ msg: 'Giá không hợp lệ' });
+    }
     // Tạo mới dòng chi tiết giá
     const priceLine = new PriceLine({
       price_header_id: priceHeaderId,
@@ -131,11 +144,6 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         name: { $regex: serviceName, $options: 'i' }, // 'i' để tìm kiếm không phân biệt chữ hoa chữ thường
         is_deleted: false,
       });
-      console.log(service);
-      console.log("-----------------");
-      // if (!service) {
-      //   return res.status(404).json({ msg: 'Không tìm thấy dịch vụ' });
-      // }
     }
 
     // Tìm loại xe theo tên gần đúng nếu có
@@ -144,10 +152,6 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         vehicle_type_name: { $regex: vehicleTypeName, $options: 'i' }, // Tìm kiếm gần đúng, không phân biệt hoa thường
         is_deleted: false,
       });
-      console.log(vehicleType);
-      // if (!vehicleType) {
-      //   return res.status(404).json({ msg: 'Không tìm thấy loại xe' });
-      // }
     }
 
     // Tìm giá của dịch vụ cho loại xe nếu có cả hai thông tin
@@ -157,26 +161,45 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         service_id: service._id,
         vehicle_type_id: vehicleType._id,
         is_deleted: false,
+        is_active: true, // Lọc PriceLine có is_active là true
+      }).populate({
+        path: 'price_header_id',
+        match: { is_active: true, is_deleted: false }, // Lọc PriceHeader có is_active là true
       }).populate('service_id vehicle_type_id');
+      priceLines = priceLines.filter(line => line.price_header_id !== null); // Loại bỏ các PriceLine không có PriceHeader phù hợp
     } else if (!service && vehicleType) {
       // Nếu chỉ có thông tin loại xe
       priceLines = await PriceLine.find({
         vehicle_type_id: vehicleType._id,
         is_deleted: false,
+        is_active: true, // Lọc PriceLine có is_active là true
+      }).populate({
+        path: 'price_header_id',
+        match: { is_active: true, is_deleted: false }, // Lọc PriceHeader có is_active là true
       }).populate('service_id vehicle_type_id');
+      priceLines = priceLines.filter(line => line.price_header_id !== null); // Loại bỏ các PriceLine không có PriceHeader phù hợp
     } else if (service && !vehicleType) {
       // Nếu chỉ có thông tin dịch vụ
       priceLines = await PriceLine.find({
         service_id: service._id,
         is_deleted: false,
+        is_active: true, // Lọc PriceLine có is_active là true
+      }).populate({
+        path: 'price_header_id',
+        match: { is_active: true, is_deleted: false }, // Lọc PriceHeader có is_active là true
       }).populate('service_id vehicle_type_id');
+      priceLines = priceLines.filter(line => line.price_header_id !== null); // Loại bỏ các PriceLine không có PriceHeader phù hợp
     } else {
       // Nếu không có tham số nào truyền vào, lấy tất cả
-      priceLines = await PriceLine.find({ is_deleted: false }).populate('service_id vehicle_type_id');
+      priceLines = await PriceLine.find({ is_deleted: false, is_active: true }).populate({
+        path: 'price_header_id',
+        match: { is_active: true, is_deleted: false }, // Lọc PriceHeader có is_active là true
+      }).populate('service_id vehicle_type_id');
+      priceLines = priceLines.filter(line => line.price_header_id !== null); // Loại bỏ các PriceLine không có PriceHeader phù hợp
     }
 
     if (priceLines.length === 0) {
-      return res.status(404).json({ msg: 'Không tìm thấy giá cho dịch vụ và loại xe này' });
+      return res.status(200).json(priceLines);
     }
 
     res.status(200).json(priceLines.map(priceLine => ({
@@ -194,7 +217,7 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
 // Cập nhật thông tin bảng giá
 exports.updatePriceHeader = async (req, res) => {
   const { priceHeaderId } = req.params;
-  const { price_list_name, start_date, end_date } = req.body;
+  const { price_list_name, start_date, end_date, is_active } = req.body;
 
   try {
     let priceHeader = await PriceHeader.findById(priceHeaderId);
@@ -205,6 +228,7 @@ exports.updatePriceHeader = async (req, res) => {
     if (price_list_name) priceHeader.price_list_name = price_list_name;
     if (start_date) priceHeader.start_date = start_date;
     if (end_date) priceHeader.end_date = end_date;
+    if (is_active !== undefined) priceHeader.is_active = is_active;
 
     priceHeader.updated_at = Date.now();
     await priceHeader.save();
@@ -212,6 +236,53 @@ exports.updatePriceHeader = async (req, res) => {
     res.json({ msg: 'Bảng giá đã được cập nhật', priceHeader });
   } catch (err) {
     console.error('Lỗi khi cập nhật bảng giá:', err.message);
+    res.status(500).send('Lỗi máy chủ trong cập nhật bảng giá');
+  }
+};
+
+//cập nhật chi tiết giá
+exports.updatePriceLine = async (req, res) => {
+  const { priceLineId } = req.params;
+  const { service_id, vehicle_type_id, price, is_active } = req.body;
+
+  try {
+    let priceLine = await PriceLine.findById(priceLineId);
+    if (!priceLine || priceLine.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy chi tiết giá' });
+    }
+    if (price <= 0) {
+      return res.status(400).json({ msg: 'Giá không hợp lệ' });
+    }
+    if (service_id) priceLine.service_id = service_id;
+    if (vehicle_type_id) priceLine.vehicle_type_id = vehicle_type_id;
+    if (price) priceLine.price = price;
+    if (is_active !== undefined) priceLine.is_active = is_active;
+
+    priceLine.updated_at = Date.now();
+    await priceLine.save();
+    res.json({ msg: 'Chi tiết giá đã được cập nhật', priceLine });
+  }
+  catch (err) {
+    console.error('Lỗi khi cập nhật chi tiết giá:', err.message);
+    res.status(500).send('Lỗi máy chủ trong cập nhật chi tiết giá');
+  }
+}
+// xóa mềm chi tiết giá
+exports.softDeletePriceLine = async (req, res) => {
+  const { priceLineId } = req.params;
+
+  try {
+    let priceLine = await PriceLine.findById(priceLineId);
+    if (!priceLine || priceLine.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy chi tiết giá' });
+    }
+    priceLine.is_deleted = true;
+    priceLine.updated_at = Date.now();
+    await priceLine.save();
+
+    res.json({ msg: 'Chi tiết giá đã được xóa', priceLine });
+  } catch (err) {
+    console.error('Lỗi khi xóa chi tiết giá:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };

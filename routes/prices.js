@@ -6,7 +6,10 @@ const {
   getAllPriceHeaders,
   getPriceLinesByHeader,
   softDeletePriceHeader, 
-  getPriceByServiceAndVehicle
+  getPriceByServiceAndVehicle,
+  updatePriceHeader,
+  updatePriceLine,
+  softDeletePriceLine
 } = require('../controllers/priceController');
 const auth = require('../middleware/auth');
 const isAdmin = require('../middleware/isAdmin');
@@ -41,5 +44,20 @@ router.get('/:priceHeaderId/lines', getPriceLinesByHeader);
 // @desc    Xóa mềm bảng giá
 // @access  Private (chỉ admin)
 router.delete('/:priceHeaderId', [auth, isAdmin], softDeletePriceHeader);
+
+// @route   PUT /api/prices/:priceHeaderId
+// @desc    Cập nhật bảng giá header 
+// @access  Private (chỉ admin)
+router.put('/:priceHeaderId', [auth, isAdmin], updatePriceHeader);
+
+// @route   PUT /api/prices/lines/:priceLineId
+// @desc    Cập nhật dòng chi tiết giá
+// @access  Private (chỉ admin)
+router.put('/lines/:priceLineId', [auth, isAdmin], updatePriceLine);
+
+// @route   DELETE /api/prices/lines/:priceLineId
+// @desc    Xóa mềm dòng chi tiết giá
+// @access  Private (chỉ admin)
+router.delete('/lines/:priceLineId', [auth, isAdmin], softDeletePriceLine);
 
 module.exports = router;
