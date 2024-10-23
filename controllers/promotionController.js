@@ -5,7 +5,7 @@ const PromotionLine = require('../models/PromotionLine');
 const PromotionDetail = require('../models/PromotionDetail');
 // Thêm chương trình khuyến mãi mới 
 exports.addPromotionHeader = async (req, res) => {
-    const { promotion_code, name, description } = req.body;
+    const { promotion_code, name, description,start_date, end_date } = req.body;
 
     try {
         // Kiểm tra xem mã khuyến mãi đã tồn tại chưa
@@ -19,6 +19,8 @@ exports.addPromotionHeader = async (req, res) => {
             promotion_code,
             name,
             description,
+            start_date,
+            end_date,
             created_at: Date.now(),
             updated_at: Date.now()
         });
