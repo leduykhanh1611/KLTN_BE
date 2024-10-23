@@ -55,6 +55,23 @@ exports.addPromotionLine = async (req, res) => {
     if(end_date <= Date.now()){
         return res.status(400).json({ msg: 'Ngày kết thúc phải sau ngày hiện tại' });
     }
+    const promotion_header = await PromotionHeader.findById(promotionHeaderId);
+    if(!promotion_header){
+        return res.status(404).json({ msg: 'Không tìm thấy chương trình khuyến mãi' });
+    }
+    if(promotion_header.is_deleted){
+        return res.status(404).json({ msg: 'Chương trình khuyến mãi đã bị xóa' });
+    }
+    if(!promotion_header.is_active){
+        return res.status(400).json({ msg: 'Chương trình khuyến mãi đang bị tắt' });
+    }
+    if(promotion_header.start_date > start_date){
+        return res.status(400).json({ msg: 'Ngày bắt đầu phải sau ngày bắt đầu của chương trình khuyến mãi' });
+    }
+    if(promotion_header.end_date < end_date){
+        return res.status(400).json({ msg: 'Ngày kết thúc phải trước ngày kết thúc của chương trình khuyến mãi' }); 
+    }
+    
     try {
         // Tạo mới dòng chi tiết khuyến mãi
         const promotionLine = new PromotionLine({
