@@ -6,7 +6,15 @@ const PromotionDetail = require('../models/PromotionDetail');
 // Thêm chương trình khuyến mãi mới 
 exports.addPromotionHeader = async (req, res) => {
     const { promotion_code, name, description,start_date, end_date } = req.body;
-
+    if (start_date >= end_date) {
+        return res.status(400).json({ msg: 'Ngày kết thúc phải sau ngày bắt đầu' });
+    }
+    if (start_date <= Date.now()) {
+        return res.status(400).json({ msg: 'Ngày bắt đầu phải sau ngày hiện tại' });
+    }
+    if (end_date <= Date.now()) {
+        return res.status(400).json({ msg: 'Ngày kết thúc phải sau ngày hiện tại' });
+    }
     try {
         // Kiểm tra xem mã khuyến mãi đã tồn tại chưa
         let existingPromotion = await PromotionHeader.findOne({ promotion_code });
