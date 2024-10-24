@@ -65,7 +65,10 @@ exports.getServiceById = async (req, res) => {
 exports.updateService = async (req, res) => {
     const { service_code, name, description, time_required } = req.body;
     const { serviceId } = req.params;
-
+    const priceline = await PriceLine.find({ service_id: serviceId, is_deleted: false });
+    if (priceline.length > 0) {
+        return res.status(400).json({ msg: 'Dịch vụ này đang được sử dụng trong bảng giá. Không được cập nhật' });
+    }
     try {
         // Tìm dịch vụ theo ID
         let service = await Service.findById(serviceId);
