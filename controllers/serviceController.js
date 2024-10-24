@@ -92,7 +92,10 @@ exports.updateService = async (req, res) => {
 // Xóa mềm dịch vụ (soft delete)
 exports.softDeleteService = async (req, res) => {
     const { serviceId } = req.params;
-
+    let priceline = await PriceLine.find({ service_id: serviceId, is_deleted: false });
+    if (priceline.length > 0) {
+        return res.status(400).json({ msg: 'Dịch vụ này đang được sử dụng trong bảng giá' });
+    }
     try {
         // Tìm dịch vụ theo ID
         let service = await Service.findById(serviceId);

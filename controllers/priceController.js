@@ -104,11 +104,15 @@ exports.softDeletePriceHeader = async (req, res) => {
 
   try {
     // Tìm bảng giá theo ID
-    let priceHeader = await PriceHeader.findById(priceHeaderId);
+    let priceHeader = await PriceHeader.findById(priceHeaderId, { is_deleted: false });
     if (!priceHeader || priceHeader.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy bảng giá' });
     }
-    
+    let priceLines = await PriceLine.find({ price_header_id: priceHeaderId, is_deleted: false });
+    if (priceLines.length > 0) {
+      return res.status(400).json({ msg: 'Bảng giá đã có giá cho dịch vụ. Không thể xóa' });
+      
+    }
     if (priceHeader.start_date <= Date.now() && priceHeader.end_date >= Date.now()) {
       priceHeader.is_active = false;
       priceHeader.updated_at = Date.now();
@@ -124,13 +128,13 @@ exports.softDeletePriceHeader = async (req, res) => {
       await priceHeader.save();
     }
     // Lấy tất cả các dòng chi tiết giá của bảng giá để xóa mềm
-    let priceLines = await PriceLine.find({ price_header_id: priceHeaderId, is_deleted: false });
+    
     // Đánh dấu các dòng chi tiết giá đã bị xóa
-    for (let priceLine of priceLines) {
-      priceLine.is_deleted = true;
-      priceLine.updated_at = Date.now();
-      await priceLine.save();
-    }
+    // for (let priceLine of priceLines) {
+    //   priceLine.is_deleted = true;
+    //   priceLine.updated_at = Date.now();
+    //   await priceLine.save();
+    // }
 
     res.json({ msg: 'Bảng giá đã được xóa', priceHeader });
   } catch (err) {
@@ -147,13 +151,9 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
     // Tìm dịch vụ theo tên gần đúng nếu có
     if (serviceName) {
       service = await Service.findOne({
-        name: { $regex: serviceName, $options: 'i' }, // 'i' để tìm kiếm không phân biệt chữ hoa chữ thường
+        service_code: { $regex: serviceName, $options: 'i' }, // 'i' để tìm kiếm không phân biệt chữ hoa chữ thường
         is_deleted: false,
       });
-      console.log(service);
-      console.log("-----------------");
-      
-      
     }
 
     // Tìm loại xe theo tên gần đúng nếu có
@@ -162,7 +162,6 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         vehicle_type_name: { $regex: vehicleTypeName, $options: 'i' }, // Tìm kiếm gần đúng, không phân biệt hoa thường
         is_deleted: false,
       });
-      console.log(vehicleType);
       
     }
 
