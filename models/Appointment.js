@@ -24,7 +24,7 @@ const AppointmentSchema = new mongoose.Schema(
     status: {
       type: String,
       required: true,
-      enum: ['scheduled', 'completed', 'cancelled'], // Adjust as necessary
+      enum: ['scheduled','waiting','completed', 'cancelled'], // Adjust as necessary
     },
     is_deleted: {
       type: Boolean,

@@ -64,9 +64,7 @@ exports.registerAppointmentWithServices = async (req, res) => {
         price_line_id: priceLine._id,
         is_deleted: false,
       });
-
       await appointmentService.save();
-
 
     }
     slot.time_required = sum;
