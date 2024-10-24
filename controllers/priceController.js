@@ -40,11 +40,16 @@ exports.addPriceHeader = async (req, res) => {
 exports.addPriceLine = async (req, res) => {
   const { service_id, vehicle_type_id, price } = req.body;
   const { priceHeaderId } = req.params;
-  
+  if (!service_id || !vehicle_type_id) {
+    return res.status(400).json({ msg: 'Dịch vụ và loại xe không được để trống' });
+  }
+  if (!price) {
+    return res.status(400).json({ msg: 'Giá không được để trống' });
+  }
+  if (price <= 0) {
+    return res.status(400).json({ msg: 'Giá không hợp lệ' });
+  }
   try {
-    if (price <= 0) {
-      return res.status(400).json({ msg: 'Giá không hợp lệ' });
-    }
     // Tạo mới dòng chi tiết giá
     const priceLine = new PriceLine({
       price_header_id: priceHeaderId,
@@ -103,6 +108,7 @@ exports.softDeletePriceHeader = async (req, res) => {
     if (!priceHeader || priceHeader.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy bảng giá' });
     }
+    
     if (priceHeader.start_date <= Date.now() && priceHeader.end_date >= Date.now()) {
       priceHeader.is_active = false;
       priceHeader.updated_at = Date.now();
@@ -144,6 +150,10 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         name: { $regex: serviceName, $options: 'i' }, // 'i' để tìm kiếm không phân biệt chữ hoa chữ thường
         is_deleted: false,
       });
+      console.log(service);
+      console.log("-----------------");
+      
+      
     }
 
     // Tìm loại xe theo tên gần đúng nếu có
@@ -152,6 +162,8 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         vehicle_type_name: { $regex: vehicleTypeName, $options: 'i' }, // Tìm kiếm gần đúng, không phân biệt hoa thường
         is_deleted: false,
       });
+      console.log(vehicleType);
+      
     }
 
     // Tìm giá của dịch vụ cho loại xe nếu có cả hai thông tin
