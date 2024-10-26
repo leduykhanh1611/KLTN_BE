@@ -9,9 +9,9 @@ const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
 // Đăng ký lịch hẹn với nhiều dịch vụ
 exports.registerAppointmentWithServices = async (req, res) => {
-  const { slot_id, vehicle_id, service_ids, appointment_datetime } = req.body;
+  const { slot_id, vehicle_id, service_ids, appointment_datetime, sumTime } = req.body;
 
-  var sum = 0; 
+
   
   if (!service_ids ) {
     return res.status(400).json({ msg: 'Vui lòng cung cấp đầy đủ thông tin dịch vụ' });
@@ -36,6 +36,8 @@ exports.registerAppointmentWithServices = async (req, res) => {
     } else {
       // Cập nhật trạng thái slot thành "booked"
       slot.status = 'booked';
+      slot.duration_minutes = sumTime;
+      slot.slot_datetime = appointment_datetime;
       await slot.save();
     }
     // Tạo lịch hẹn mới
@@ -44,7 +46,7 @@ exports.registerAppointmentWithServices = async (req, res) => {
       vehicle_id,
       slot_id,
       appointment_datetime,
-      status: 'scheduled',
+      status: 'waiting',
       is_deleted: false,
     });
 
@@ -67,8 +69,6 @@ exports.registerAppointmentWithServices = async (req, res) => {
       await appointmentService.save();
 
     }
-    slot.time_required = sum;
-    slot.slot_datetime = appointment_datetime;
     await slot.save();
     res.status(201).json({ msg: 'Đăng ký lịch hẹn thành công', appointment });
   } catch (err) {
