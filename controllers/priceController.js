@@ -49,6 +49,13 @@ exports.addPriceLine = async (req, res) => {
   if (price <= 0) {
     return res.status(400).json({ msg: 'Giá không hợp lệ' });
   }
+  const priceHeader = await PriceHeader.findById(priceHeaderId);
+  if (!priceHeader || priceHeader.is_deleted) {
+    return res.status(404).json({ msg: 'Không tìm thấy bảng giá' });
+  }
+  if (priceHeader.start_date <= Date.now() && priceHeader.end_date >= Date.now()) {
+    return res.status(400).json({ msg: 'Bảng giá đã hết hạn' });
+  }
   const priceLine = await PriceLine.findOne({ price_header_id: priceHeaderId, service_id: service_id,vehicle_type_id: vehicle_type_id, is_deleted: false });
   if (priceLine) {
     return res.status(400).json({ msg: 'Giá của dịch vụ cho loại xe trên đã tồn tại' });
