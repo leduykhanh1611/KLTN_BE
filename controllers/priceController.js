@@ -49,7 +49,7 @@ exports.addPriceLine = async (req, res) => {
   if (price <= 0) {
     return res.status(400).json({ msg: 'Giá không hợp lệ' });
   }
-  const priceLine = await PriceLine.findOne({ price_header_id: priceHeaderId, service_id, vehicle_type_id, is_deleted: false });
+  const priceLine = await PriceLine.findOne({ price_header_id: priceHeaderId, service_id: service_id,vehicle_type_id: vehicle_type_id, is_deleted: false });
   if (priceLine) {
     return res.status(400).json({ msg: 'Giá của dịch vụ cho loại xe trên đã tồn tại' });
   }
