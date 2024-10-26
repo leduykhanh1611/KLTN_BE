@@ -527,3 +527,15 @@ exports.getPromotionWithDetails = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
+// Lấy tất cả chi tiết khuyến mãi
+exports.getAllPromotionDetails = async (req, res) => {
+    const { promotionLineId } = req.params;
+    try {
+        const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotionLineId, is_deleted: false }).populate('applicable_rank_id service_id');
+
+        res.json(promotionDetails);
+    } catch (err) {
+        console.error('Lỗi khi lấy danh sách chi tiết khuyến mãi:', err.message);
+        res.status(500).send('Lỗi máy chủ');
+    }
+};

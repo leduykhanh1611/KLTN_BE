@@ -18,7 +18,8 @@ const {
   getPromotionDetailsByLine,
   updatePromotionDetail,
   softDeletePromotionDetail, 
-  getPromotionWithDetails
+  getPromotionWithDetails,
+  getAllPromotionDetails
 } = require('../controllers/promotionController');
 const auth = require('../middleware/auth');
 const isAdmin = require('../middleware/isAdmin');
@@ -114,4 +115,9 @@ router.delete('/details/:promotionDetailId', [auth, isAdmin], softDeletePromotio
 // @desc    Lấy chương trình khuyến mãi, bao gồm header, các line và detail thuộc header đó
 // @access  Public
 router.get('/:promotionHeaderId/details', getPromotionWithDetails);
+
+// @route   GET /api/promotions/details
+// @desc    Lấy tất cả chi tiết khuyến mãi
+// @access  Private (chỉ admin)
+router.get('/line/details/:promotionLineId', [auth, isAdmin], getAllPromotionDetails);
 module.exports = router;
