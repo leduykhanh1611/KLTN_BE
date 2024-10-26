@@ -53,7 +53,7 @@ exports.addPriceLine = async (req, res) => {
   if (!priceHeader || priceHeader.is_deleted) {
     return res.status(404).json({ msg: 'Không tìm thấy bảng giá' });
   }
-  if ( priceHeader.end_date >= Date.now()) {
+  if ( priceHeader.end_date <= Date.now()) {
     return res.status(400).json({ msg: 'Bảng giá đã hết hạn' });
   }
   const priceLine = await PriceLine.findOne({ price_header_id: priceHeaderId, service_id: service_id,vehicle_type_id: vehicle_type_id, is_deleted: false });
