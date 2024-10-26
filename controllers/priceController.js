@@ -164,7 +164,7 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
       });
       
     }
-
+    const today = new Date(); // Lấy ngày hiện tại
     // Tìm giá của dịch vụ cho loại xe nếu có cả hai thông tin
     let priceLines;
     if (service && vehicleType) {
@@ -175,7 +175,7 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         is_active: true, // Lọc PriceLine có is_active là true
       }).populate({
         path: 'price_header_id',
-        match: { is_active: true, is_deleted: false }, // Lọc PriceHeader có is_active là true
+        match: { is_active: true, is_deleted: false,  start_date: { $lte: today }, end_date: { $gte: today }  }, // Lọc PriceHeader có is_active là true ngày hiện tại nằm trong khoảng giữa của startdate và enddate
       }).populate('service_id vehicle_type_id');
       priceLines = priceLines.filter(line => line.price_header_id !== null); // Loại bỏ các PriceLine không có PriceHeader phù hợp
     } else if (!service && vehicleType) {
@@ -186,7 +186,7 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         is_active: true, // Lọc PriceLine có is_active là true
       }).populate({
         path: 'price_header_id',
-        match: { is_active: true, is_deleted: false }, // Lọc PriceHeader có is_active là true
+        match: { is_active: true, is_deleted: false,  start_date: { $lte: today }, end_date: { $gte: today } }, // Lọc PriceHeader có is_active là true
       }).populate('service_id vehicle_type_id');
       priceLines = priceLines.filter(line => line.price_header_id !== null); // Loại bỏ các PriceLine không có PriceHeader phù hợp
     } else if (service && !vehicleType) {
@@ -197,14 +197,14 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
         is_active: true, // Lọc PriceLine có is_active là true
       }).populate({
         path: 'price_header_id',
-        match: { is_active: true, is_deleted: false }, // Lọc PriceHeader có is_active là true
+        match: { is_active: true, is_deleted: false,  start_date: { $lte: today }, end_date: { $gte: today } }, // Lọc PriceHeader có is_active là true
       }).populate('service_id vehicle_type_id');
       priceLines = priceLines.filter(line => line.price_header_id !== null); // Loại bỏ các PriceLine không có PriceHeader phù hợp
     } else {
       // Nếu không có tham số nào truyền vào, lấy tất cả
       priceLines = await PriceLine.find({ is_deleted: false, is_active: true }).populate({
         path: 'price_header_id',
-        match: { is_active: true, is_deleted: false }, // Lọc PriceHeader có is_active là true
+        match: { is_active: true, is_deleted: false,  start_date: { $lte: today }, end_date: { $gte: today } }, // Lọc PriceHeader có is_active là true
       }).populate('service_id vehicle_type_id');
       priceLines = priceLines.filter(line => line.price_header_id !== null); // Loại bỏ các PriceLine không có PriceHeader phù hợp
     }
