@@ -101,13 +101,11 @@ exports.addPromotionLine = async (req, res) => {
 // Thêm chi tiết khuyến mãi cho dòng khuyến mãi
 exports.addPromotionDetail = async (req, res) => {
     const { promotionLineId } = req.params;
-    const { vehicle_type_id, service_id, applicable_rank_id, discount_value, min_order_value } = req.body;
+    const { applicable_rank_id, discount_value, min_order_value } = req.body;
 
     try {
         const promotionDetail = new PromotionDetail({
             promotion_line_id: promotionLineId,
-            vehicle_type_id,
-            service_id,
             applicable_rank_id,
             discount_value,
             min_order_value,
@@ -117,7 +115,7 @@ exports.addPromotionDetail = async (req, res) => {
         res.status(201).json({ msg: 'Chi tiết khuyến mãi đã được thêm', promotionDetail });
     } catch (err) {
         console.error('Lỗi khi thêm chi tiết khuyến mãi:', err.message);
-        res.status(500).send('Lỗi máy chủ', err.message);
+        res.status(500).send('Lỗi máy chủ');
     }
 };
 //dùng cái này
