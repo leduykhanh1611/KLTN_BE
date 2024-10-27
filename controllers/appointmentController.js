@@ -9,10 +9,7 @@ const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
 // Đăng ký lịch hẹn với nhiều dịch vụ
 exports.registerAppointmentWithServices = async (req, res) => {
-  const { slot_id, vehicle_id, service_ids, appointment_datetime, sumTime } = req.body;
-
-
-  
+  const { slot_id, vehicle_id, service_ids, appointment_datetime, sumTime } = req.body;  
   if (!service_ids ) {
     return res.status(400).json({ msg: 'Vui lòng cung cấp đầy đủ thông tin dịch vụ' });
   }

@@ -117,7 +117,7 @@ exports.addPromotionDetail = async (req, res) => {
         res.status(201).json({ msg: 'Chi tiết khuyến mãi đã được thêm', promotionDetail });
     } catch (err) {
         console.error('Lỗi khi thêm chi tiết khuyến mãi:', err.message);
-        res.status(500).send('Lỗi máy chủ');
+        res.status(500).send('Lỗi máy chủ', err.message);
     }
 };
 //dùng cái này
