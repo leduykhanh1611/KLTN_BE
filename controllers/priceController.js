@@ -229,6 +229,8 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
       service: priceLine.service_id.name,
       vehicle_type: priceLine.vehicle_type_id.vehicle_type_name,
       price: priceLine.price,
+      service_code : priceLine.service_id.service_code,
+      time_required: priceLine.service_id.time_required
     })));
   } catch (err) {
     console.error('Lỗi khi lấy giá của dịch vụ:', err.message);
