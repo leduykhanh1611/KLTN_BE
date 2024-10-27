@@ -57,7 +57,6 @@ exports.registerAppointmentWithServices = async (req, res) => {
       if (!priceLine) {
         return res.status(400).json({ msg: `Không tìm thấy giá cho dịch vụ ${service_id}` });
       }
-      sum += priceLine.service_id.time_required;
       const appointmentService = new AppointmentService({
         appointment_id: appointment._id,
         price_line_id: priceLine._id,
