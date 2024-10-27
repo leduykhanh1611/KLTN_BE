@@ -8,7 +8,9 @@ const {
   processAppointmentArrival,
   filterAppointmentsByDate,
   getCompletedAppointments,
-  updateAppointment
+  updateAppointment,
+  registerAppointmentWithoutSlot,
+  getAllAppointmentsWithoutSlot
 } = require('../controllers/appointmentController');
 
 const auth = require('../middleware/auth');
@@ -17,6 +19,18 @@ const auth = require('../middleware/auth');
 // @desc    Đăng ký lịch hẹn với nhiều dịch vụ
 // @access  Private (phải đăng nhập)
 router.post('/', auth, registerAppointmentWithServices);
+
+
+
+// @route   POST /api/appointments/without-slot
+// @desc    Đăng ký lịch hẹn không có slot
+// @access  Private (phải đăng nhập)
+router.post('/without-slot', auth, registerAppointmentWithoutSlot);
+
+// @route   GET /api/appointments/without-slot
+// @desc    Lấy danh sách lịch hẹn không có slot
+// @access  Private (phải đăng nhập)
+router.get('/get/without-slot', auth, getAllAppointmentsWithoutSlot);
 
 // @route   GET /api/appointments
 // @desc    Lấy danh sách lịch hẹn theo ngày
