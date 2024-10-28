@@ -15,6 +15,7 @@ const PromotionDetailSchema = new mongoose.Schema(
     applicable_rank_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CustomerRank',
+      default: null,
     },
     discount_value: {
       type: Number,

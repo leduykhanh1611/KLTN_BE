@@ -110,7 +110,7 @@ exports.addPromotionDetail = async (req, res) => {
         if (min_order_value < 0) {
             return res.status(400).json({ msg: 'Giá trị đơn hàng tối thiểu không hợp lệ' });
         }
-        if (!conditional_rank_id) {
+        if (!applicable_rank_id) {
             const promotionDetail = new PromotionDetail({
                 promotion_line_id: promotionLineId,
                 discount_value,
