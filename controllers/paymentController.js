@@ -157,13 +157,13 @@ exports.generateInvoice = async (req, res) => {
         // Áp dụng cả khuyến mãi cố định và khuyến mãi theo phần trăm nếu có
         for (let promotion of activePromotions) {
             // Áp dụng khuyến mãi nếu khách hàng đủ điều kiện (ví dụ: hạng khách hàng phù hợp)  
-            if (promotion.discount_type === 2) {
+            if (promotion.discount_type == 2) {
                 const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotion._id, is_deleted: false });
                 if (promotionDetails.min_order_value <= totalAmount) {
                     fixedDiscount += promotion.discount_value;
                     promotionHeader.push(promotionDetails._id);
                 }
-            } else if (promotion.discount_type === 1) {
+            } else if (promotion.discount_type == 1) {
                 const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotion._id, is_deleted: false });
                 const calculatedPercentageDiscount = totalAmount * (promotionDetails.discount_value / 100);
                 if (calculatedPercentageDiscount > percentageDiscount) {
