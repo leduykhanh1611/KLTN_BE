@@ -348,7 +348,7 @@ exports.getCompletedAppointments = async (req, res) => {
       .lean();
 
     if (appointments.length === 0) {
-      return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn nào đã hoàn thành' });
+      return res.json(appointments);;
     }
 
     // Tìm hóa đơn liên quan đến các lịch hẹn
