@@ -14,6 +14,7 @@ const Cus = require('../models/Customer');
 const employee = require('../models/Employee');
 const PromotionLine = require('../models/PromotionLine');
 const PromotionDetail = require('../models/PromotionDetail');
+const { console } = require('inspector');
 const payOS = new PayOS(
     process.env.PAYOS_CLIENT_ID,
     process.env.PAYOS_API_KEY,
@@ -29,7 +30,7 @@ exports.createPaymentLink = async (req, res) => {
         if (!invoice || invoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn hợp lệ' });
         }
-        if (invoice.status !== 'paid') {
+        if (invoice.status === 'paid') {
             return res.status(400).json({ msg: 'Hóa đơn đã được thanh toán' });
         }
         // Lấy chi tiết hóa đơn
@@ -156,14 +157,14 @@ exports.generateInvoice = async (req, res) => {
         // Áp dụng cả khuyến mãi cố định và khuyến mãi theo phần trăm nếu có
         for (let promotion of activePromotions) {
             // Áp dụng khuyến mãi nếu khách hàng đủ điều kiện (ví dụ: hạng khách hàng phù hợp)  
-            if (promotion.discount_type === 2 ) {
-                const promotionDetails = await PromotionDetail.find({promotion_line_id: promotion._id, is_deleted: false});
+            if (promotion.discount_type === 2) {
+                const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotion._id, is_deleted: false });
                 if (promotionDetails.min_order_value <= totalAmount) {
                     fixedDiscount += promotion.discount_value;
                     promotionHeader.push(promotionDetails._id);
                 }
             } else if (promotion.discount_type === 1) {
-                const promotionDetails = await PromotionDetail.find({promotion_line_id: promotion._id, is_deleted: false});
+                const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotion._id, is_deleted: false });
                 const calculatedPercentageDiscount = totalAmount * (promotionDetails.discount_value / 100);
                 if (calculatedPercentageDiscount > percentageDiscount) {
                     percentageDiscount = calculatedPercentageDiscount;
@@ -205,8 +206,27 @@ exports.generateInvoice = async (req, res) => {
 
             await invoiceDetail.save();
         }
+        // Lấy lại thông tin hóa đơn đã lưu, bao gồm các thông tin liên quan
+        const savedInvoice = await Invoice.findById(invoice._id)
+            .populate('customer_id')
+            .populate('employee_id')
+            .populate('appointment_id')
+            .populate('promotion_header_id')
+            .lean();
 
-        res.status(201).json({ msg: 'Hóa đơn đã được tạo thành công', invoice });
+        // Lấy chi tiết hóa đơn
+        const invoiceDetailList = await InvoiceDetail.find({ invoice_id: invoice._id, is_deleted: false })
+            .populate('service_id')
+            .lean();
+
+        // Gán chi tiết hóa đơn vào đối tượng hóa đơn
+        savedInvoice.details = invoiceDetailList;
+
+        // Trả về hóa đơn đầy đủ
+        res.status(201).json({
+            msg: 'Hóa đơn đã được tạo thành công',
+            invoice: savedInvoice,
+        });
     } catch (err) {
         console.error('Lỗi khi tạo hóa đơn:', err.message);
         res.status(500).send('Lỗi máy chủ');
@@ -214,53 +234,54 @@ exports.generateInvoice = async (req, res) => {
 };
 // Xử lý webhook trả về kết quả thanh toán
 exports.handlePaymentWebhook = async (req, res) => {
-    const { orderCode, transaction_id, code, desc, counterAccountBankId, counterAccountBankName, counterAccountName, counterAccountNumber, virtualAccountName, virtualAccountNumber } = req.body.data;
+    // const { orderCode, transaction_id, code, desc, counterAccountBankId, counterAccountBankName, counterAccountName, counterAccountNumber, virtualAccountName, virtualAccountNumber } = req.body.data;
+    console.log(req.body);
+    res.json({ msg: 'Webhook xử lý thành công' });
+    // try {
+    //     // Tìm thông tin thanh toán theo orderCode
+    //     const payment = await Payment.findOne({ order_code: orderCode });
+    //     if (!payment) {
+    //         return res.status(200).json({ msg: 'Không tìm thấy thông tin thanh toán' });
+    //     }
 
-    try {
-        // Tìm thông tin thanh toán theo orderCode
-        const payment = await Payment.findOne({ order_code: orderCode });
-        if (!payment) {
-            return res.status(200).json({ msg: 'Không tìm thấy thông tin thanh toán' });
-        }
+    //     // Cập nhật trạng thái thanh toán
+    //     payment.payment_status = payment_status;
+    //     payment.transaction_id = transaction_id;
+    //     payment.code = code;
+    //     payment.desc = desc;
+    //     payment.counter_account_bank_id = counterAccountBankId || null;
+    //     payment.counter_account_bank_name = counterAccountBankName || null;
+    //     payment.counter_account_name = counterAccountName || null;
+    //     payment.counter_account_number = counterAccountNumber || null;
+    //     payment.virtual_account_name = virtualAccountName || null;
+    //     payment.virtual_account_number = virtualAccountNumber || null;
+    //     await payment.save();
 
-        // Cập nhật trạng thái thanh toán
-        payment.payment_status = payment_status;
-        payment.transaction_id = transaction_id;
-        payment.code = code;
-        payment.desc = desc;
-        payment.counter_account_bank_id = counterAccountBankId || null;
-        payment.counter_account_bank_name = counterAccountBankName || null;
-        payment.counter_account_name = counterAccountName || null;
-        payment.counter_account_number = counterAccountNumber || null;
-        payment.virtual_account_name = virtualAccountName || null;
-        payment.virtual_account_number = virtualAccountNumber || null;
-        await payment.save();
+    //     // Nếu thanh toán thành công, cập nhật trạng thái hóa đơn
+    //     if (code === '00') {
+    //         const invoice = await Invoice.findById(payment.invoice_id);
+    //         if (invoice) {
+    //             invoice.status = 'paid';
+    //             await invoice.save();
+    //         }
+    //         const user = await Cus.findById(invoice.customer_id);
+    //         if (user) {
+    //             user.total_spending += invoice.final_amount;
+    //             await user.save();
+    //         }
+    //     } else {
+    //         const invoice = await Invoice.findById(payment.invoice_id);
+    //         if (invoice) {
+    //             invoice.status = 'cancelled';
+    //             await invoice.save();
+    //         }
+    //     }
 
-        // Nếu thanh toán thành công, cập nhật trạng thái hóa đơn
-        if (code === '00') {
-            const invoice = await Invoice.findById(payment.invoice_id);
-            if (invoice) {
-                invoice.status = 'paid';
-                await invoice.save();
-            }
-            const user = await Cus.findById(invoice.customer_id);
-            if (user) {
-                user.total_spending += invoice.final_amount;
-                await user.save();
-            }
-        } else {
-            const invoice = await Invoice.findById(payment.invoice_id);
-            if (invoice) {
-                invoice.status = 'cancelled';
-                await invoice.save();
-            }
-        }
-
-        res.status(200).json({ msg: 'Webhook xử lý thành công' });
-    } catch (err) {
-        console.error('Lỗi khi xử lý webhook:', err.message);
-        res.status(500).send('Lỗi máy chủ');
-    }
+    //     res.status(200).json({ msg: 'Webhook xử lý thành công' });
+    // } catch (err) {
+    //     console.error('Lỗi khi xử lý webhook:', err.message);
+    //     res.status(500).send('Lỗi máy chủ');
+    // }
 };
 
 // Lấy thông tin hóa đơn và in ra bản PDF
