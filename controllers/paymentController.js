@@ -12,8 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const Cus = require('../models/Customer');
 const employee = require('../models/Employee');
-
-
+const PromotionLine = require('../models/PromotionLine');
+const PromotionDetail = require('../models/PromotionDetail');
 const payOS = new PayOS(
     process.env.PAYOS_CLIENT_ID,
     process.env.PAYOS_API_KEY,
@@ -23,14 +23,15 @@ const payOS = new PayOS(
 // Tạo liên kết thanh toán cho khách hàng
 exports.createPaymentLink = async (req, res) => {
     const { invoiceId } = req.params;
-
     try {
         // Tìm hóa đơn theo ID
         const invoice = await Invoice.findById(invoiceId);
-        if (!invoice || invoice.is_deleted || invoice.status !== 'pending') {
+        if (!invoice || invoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn hợp lệ' });
         }
-
+        if (invoice.status !== 'paid') {
+            return res.status(400).json({ msg: 'Hóa đơn đã được thanh toán' });
+        }
         // Lấy chi tiết hóa đơn
         const invoiceDetails = await InvoiceDetail.find({
             invoice_id: invoiceId,
@@ -50,8 +51,8 @@ exports.createPaymentLink = async (req, res) => {
                 quantity: detail.quantity,
                 price: detail.price,
             })),
-            cancelUrl: 'http://localhost:3000/cancel.html',
-            returnUrl: 'http://localhost:3000/success.html',
+            cancelUrl: 'https://auto-tech-mu.vercel.app/admin',
+            returnUrl: 'https://auto-tech-mu.vercel.app/admin',
         };
 
         const paymentLinkRes = await payOS.createPaymentLink(paymentBody);
@@ -137,28 +138,36 @@ exports.generateInvoice = async (req, res) => {
         let promotionHeader = [];
 
         // Kiểm tra các chương trình khuyến mãi áp dụng cho khách hàng
-        const activePromotions = await PromotionHeader.find({
+        const activePromotions = await PromotionLine.find({
             is_active: true,
             is_deleted: false,
             start_date: { $lte: Date.now() },
             end_date: { $gte: Date.now() },
+        }).populate({
+            path: 'promotion_header_id',
+            match: {
+                is_active: true,
+                is_deleted: false,
+                start_date: { $lte: Date.now() },
+                end_date: { $gte: Date.now() },
+            },
         });
 
         // Áp dụng cả khuyến mãi cố định và khuyến mãi theo phần trăm nếu có
         for (let promotion of activePromotions) {
-            // Áp dụng khuyến mãi nếu khách hàng đủ điều kiện (ví dụ: hạng khách hàng phù hợp)
-            if (!promotion.applicable_rank_id || promotion.applicable_rank_id.equals(appointment.customer_id.customer_rank_id)) {
-                if (promotion.discount_type === 'fixed' && promotion.discount_value <= totalAmount) {
-                    if (promotion.discount_value > fixedDiscount) {
-                        fixedDiscount = promotion.discount_value;
-                        promotionHeader.push(promotion._id);
-                    }
-                } else if (promotion.discount_type === 'percentage') {
-                    const calculatedPercentageDiscount = totalAmount * (promotion.discount_value / 100);
-                    if (calculatedPercentageDiscount > percentageDiscount) {
-                        percentageDiscount = calculatedPercentageDiscount;
-                        promotionHeader.push(promotion._id);
-                    }
+            // Áp dụng khuyến mãi nếu khách hàng đủ điều kiện (ví dụ: hạng khách hàng phù hợp)  
+            if (promotion.discount_type === 2 ) {
+                const promotionDetails = await PromotionDetail.find({promotion_line_id: promotion._id, is_deleted: false});
+                if (promotionDetails.min_order_value <= totalAmount) {
+                    fixedDiscount += promotion.discount_value;
+                    promotionHeader.push(promotionDetails._id);
+                }
+            } else if (promotion.discount_type === 1) {
+                const promotionDetails = await PromotionDetail.find({promotion_line_id: promotion._id, is_deleted: false});
+                const calculatedPercentageDiscount = totalAmount * (promotionDetails.discount_value / 100);
+                if (calculatedPercentageDiscount > percentageDiscount) {
+                    percentageDiscount = calculatedPercentageDiscount;
+                    promotionHeader.push(promotionDetails._id);
                 }
             }
         }

@@ -104,15 +104,30 @@ exports.addPromotionDetail = async (req, res) => {
     const { applicable_rank_id, discount_value, min_order_value } = req.body;
 
     try {
-        const promotionDetail = new PromotionDetail({
-            promotion_line_id: promotionLineId,
-            applicable_rank_id,
-            discount_value,
-            min_order_value,
-        });
-
-        await promotionDetail.save();
-        res.status(201).json({ msg: 'Chi tiết khuyến mãi đã được thêm', promotionDetail });
+        if (discount_value < 0) {
+            return res.status(400).json({ msg: 'Giá trị giảm giá không hợp lệ' });
+        }
+        if (min_order_value < 0) {
+            return res.status(400).json({ msg: 'Giá trị đơn hàng tối thiểu không hợp lệ' });
+        }
+        if (!conditional_rank_id) {
+            const promotionDetail = new PromotionDetail({
+                promotion_line_id: promotionLineId,
+                discount_value,
+                min_order_value,
+            });
+            await promotionDetail.save();
+            res.status(201).json({ msg: 'Chi tiết khuyến mãi đã được thêm', promotionDetail });
+        }else{
+            const promotionDetail = new PromotionDetail({
+                promotion_line_id: promotionLineId,
+                applicable_rank_id,
+                discount_value,
+                min_order_value,
+            });
+            await promotionDetail.save();
+            res.status(201).json({ msg: 'Chi tiết khuyến mãi đã được thêm', promotionDetail });
+        } 
     } catch (err) {
         console.error('Lỗi khi thêm chi tiết khuyến mãi:', err.message);
         res.status(500).send('Lỗi máy chủ');
