@@ -280,8 +280,11 @@ exports.processAppointmentArrival = async (req, res) => {
     appointment.status = 'completed';
     await appointment.save();
     const slot = await Slot.findById(appointment.slot_id);
+    if (!slot) {
+      return res.status(404).json({ msg: 'Không tìm thấy slot' });
+    }
     slot.status = 'available';
-    slot.slot_datetime = null;
+    // slot.slot_datetime = null;
     slot.duration_minutes = 0;
     await slot.save();
 
