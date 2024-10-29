@@ -9,8 +9,8 @@ const Customer = require('../models/Customer');
 const Invoice = require('../models/Invoice');
 // Đăng ký lịch hẹn với nhiều dịch vụ
 exports.registerAppointmentWithServices = async (req, res) => {
-  const { slot_id, vehicle_id, service_ids, appointment_datetime, sumTime } = req.body;  
-  if (!service_ids ) {
+  const { slot_id, vehicle_id, service_ids, appointment_datetime, sumTime } = req.body;
+  if (!service_ids) {
     return res.status(400).json({ msg: 'Vui lòng cung cấp đầy đủ thông tin dịch vụ' });
   }
   if (!appointment_datetime) {
@@ -76,7 +76,7 @@ exports.registerAppointmentWithServices = async (req, res) => {
 // đặt lịch hẹn không cần slot 
 exports.registerAppointmentWithoutSlot = async (req, res) => {
   const { vehicle_id, service_ids, appointment_datetime } = req.body;
-  if (!service_ids ) {
+  if (!service_ids) {
     return res.status(400).json({ msg: 'Vui lòng cung cấp đầy đủ thông tin dịch vụ' });
   }
   if (!appointment_datetime) {
@@ -129,7 +129,7 @@ exports.registerAppointmentWithoutSlot = async (req, res) => {
 exports.getAllAppointmentsWithoutSlot = async (req, res) => {
   try {
     const appointments = await Appointment.find({ slot_id: null, is_deleted: false })
-      .populate('customer_id')  
+      .populate('customer_id')
       .populate('vehicle_id')
       .lean();
     res.json(appointments);
@@ -138,8 +138,6 @@ exports.getAllAppointmentsWithoutSlot = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
-
 
 // Lấy thông tin lịch hẹn cùng các dịch vụ liên quan và tổng phí
 exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
@@ -283,6 +281,8 @@ exports.processAppointmentArrival = async (req, res) => {
     await appointment.save();
     const slot = await Slot.findById(appointment.slot_id);
     slot.status = 'available';
+    slot.slot_datetime = null;
+    slot.duration_minutes = 0;
     await slot.save();
 
     res.json({ msg: 'Khách hàng đã đến và sử dụng dịch vụ thành công', appointment });
@@ -447,3 +447,43 @@ exports.updateAppointment = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
+// thêm slot cho lịch hẹn chưa có slot
+exports.addSlotToAppointment = async (req, res) => {
+  const { appointmentId } = req.params;
+
+  try {
+    // Tìm lịch hẹn
+    const appointment = await Appointment.findById(appointmentId);
+    const appointmentService = await AppointmentService.find({ appointment_id: appointmentId }).populate('price_line_id').lean();
+
+    if (!appointment || appointment.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn' });
+    }
+    // Kiểm tra xem lịch hẹn đã có slot chưa
+    if (appointment.slot_id) {
+      return res.status(400).json({ msg: 'Lịch hẹn đã có slot' });
+    }
+    const slot = await Slot.findOne({ status: 'available', is_deleted: false });
+    if (!slot) {
+      return res.status(404).json({ msg: 'Không tìm thấy slot khả dụng' });
+    }
+    // Cập nhật slot cho lịch hẹn
+    appointment.slot_id = slot._id;
+    await appointment.save();
+    slot.status = 'booked';
+    slot.slot_datetime = Date.now();
+    slot.duration_minutes = 0;
+    for (let service of appointmentService) {
+      let services = await Service.findById(service.price_line_id.service_id);
+      slot.duration_minutes += services.time_required;
+    }
+    await slot.save();
+    res.status(200).json({ msg: 'Thêm slot cho lịch hẹn thành công', apoointment: appointment });
+  } catch (err) {
+    console.error('Lỗi khi thêm slot cho lịch hẹn:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+}
+
+
