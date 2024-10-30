@@ -469,7 +469,7 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             opacity: logoOpacity
         });
 
-        doc.fontSize(20).fillColor('black').text('Hóa đơn thanh toán', { align: 'center' });
+        doc.fontSize(20).fillColor('black').text('Hóa đơn', { align: 'center' });
         doc.moveDown();
         const customer = savedInvoice.customer_id;
         doc.fontSize(12)
@@ -477,7 +477,6 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             .text(`Email: ${customer.email}`)
             .text(`Địa chỉ: ${customer.address}`)
             .text(`Số điện thoại: ${customer.phone_number}`)
-            .text(`Loại xe: ${customer.phone_number}`)
             .moveDown();
 
         if (savedInvoice.employee_id) {

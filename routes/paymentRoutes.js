@@ -66,10 +66,10 @@ router.post('/webhook', async (req, res) => {
 // @route   GET /api/payments/invoice/:invoiceId
 // @desc    Lấy thông tin hóa đơn
 // @access  Private (phải đăng nhập)
-router.get('/invoice/:invoiceId',  getInvoice);
+router.get('/invoice/:invoiceId', auth, getInvoice);
 
 // @route   GET /api/payments/invoice/:invoiceId/pdf
 // @desc    Lấy thông tin hóa đơn và in ra bản PDF
 // @access  Private (phải đăng nhập)
-router.get('/invoice/:invoiceId/pdf', auth, getInvoiceAndGeneratePDF);
+router.get('/invoice/:invoiceId/pdf', getInvoiceAndGeneratePDF);
 module.exports = router;
