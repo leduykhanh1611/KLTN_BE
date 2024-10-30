@@ -135,7 +135,7 @@ exports.getAllSlotsWithAppointments = async (req, res) => {
         slot_id: slot._id,
         is_deleted: false,
         status: { $in: ['waiting'] }
-      }).populate('vehicle_id customer_id').lean();
+      }).populate('vehicle_id customer_id').sort({ createdAt: -1 }).lean();
       
       // Đẩy slot và các lịch hẹn của slot đó vào danh sách kết quả
       result.push({
