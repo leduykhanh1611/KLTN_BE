@@ -596,8 +596,6 @@ exports.getInvoice = async (req, res) => {
     const { invoiceId } = req.params;
 
     try {
-       
-
         // Lấy lại thông tin hóa đơn đã lưu, bao gồm các thông tin liên quan
         const savedInvoice = await Invoice.findById(invoiceId)
             .populate('customer_id')
@@ -606,12 +604,12 @@ exports.getInvoice = async (req, res) => {
             .populate('promotion_header_ids')
             .lean();
 
-        if (!invoice || invoice.is_deleted) {
+        if (!savedInvoice || savedInvoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
         }
 
         // Lấy chi tiết hóa đơn
-        const invoiceDetailList = await InvoiceDetail.find({ invoice_id: invoice._id, is_deleted: false })
+        const invoiceDetailList = await InvoiceDetail.find({ invoice_id: savedInvoice._id, is_deleted: false })
             .populate('service_id')
             .lean();
 
@@ -634,12 +632,12 @@ exports.getInvoice = async (req, res) => {
         }
 
         // Trả về hóa đơn đầy đủ
-        res.status(201).json({
-            msg: 'Hóa đơn đã được tạo thành công',
+        res.status(200).json({
+            msg: 'Hóa đơn đã được lấy thành công',
             invoice: savedInvoice,
         });
     } catch (err) {
         console.error('Lỗi khi lấy thông tin hóa đơn:', err.message);
-        res.status(500).send('Lỗi máy chủ');
+        res.status(500).send(`Lỗi máy chủ: ${err.message}`);
     }
 };
