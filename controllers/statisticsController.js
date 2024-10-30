@@ -55,7 +55,14 @@ exports.getRevenueByTimePeriod = async (req, res) => {
         });
 
         const growthRates = revenueArray.map(([, revenue], index) => {
-            if (index === 0) return { month: revenueArray[index][0], growth: null };
+            if (index === 0) {
+                // Lấy doanh thu tháng trước tháng đầu tiên nếu có
+                const previousMonth = new Date(revenueArray[index][0].split('/')[1], revenueArray[index][0].split('/')[0] - 2);
+                const previousMonthKey = `${previousMonth.getMonth() + 1}/${previousMonth.getFullYear()}`;
+                const previousRevenue = monthlyRevenue[previousMonthKey] || 0;
+                const growth = previousRevenue === 0 && revenue === 0 ? 0 : previousRevenue === 0 ? 100 : ((revenue - previousRevenue) / previousRevenue) * 100;
+                return { month: revenueArray[index][0], growth: growth.toFixed(2) + '%' };
+            }
             const previousRevenue = revenueArray[index - 1][1];
             const growth = previousRevenue === 0 && revenue === 0 ? 0 : previousRevenue === 0 ? 100 : ((revenue - previousRevenue) / previousRevenue) * 100;
             return { month: revenueArray[index][0], growth: growth.toFixed(2) + '%' };
@@ -67,6 +74,7 @@ exports.getRevenueByTimePeriod = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
+
 
 //Thống kê Số Lịch Hẹn Theo Khoảng Thời Gian
 exports.getAppointmentsByTimePeriod = async (req, res) => {
