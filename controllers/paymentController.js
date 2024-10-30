@@ -93,11 +93,15 @@ exports.createPaymentLink = async (req, res) => {
 exports.generateInvoice = async (req, res) => {
     const { appointmentId, employeeId } = req.params;
     try {
-        console.log('Bắt đầu tạo hóa đơn...');
+        
         // Tìm lịch hẹn theo ID
         const appointment = await Appointment.findById(appointmentId).populate('vehicle_id customer_id').lean();
         if (!appointment || appointment.is_deleted || appointment.status !== 'completed') {
             return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn đã hoàn thành' });
+        }
+        const invoiceExist = await Invoice.findOne({ appointment_id: appointmentId });
+        if (invoiceExist) {
+            return res.status(400).json({ msg: 'Hóa đơn đã được tạo' });
         }
 
         // Lấy tất cả các dịch vụ liên quan đến lịch hẹn
