@@ -99,6 +99,10 @@ exports.generateInvoice = async (req, res) => {
         if (!appointment || appointment.is_deleted || appointment.status !== 'completed') {
             return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn đã hoàn thành' });
         }
+        const emp = await employee.findById(employeeId);    
+        if (!emp || emp.is_deleted) {
+            return res.status(404).json({ msg: 'Không tìm thấy nhân viên' });
+        }
         const invoiceExist = await Invoice.findOne({ appointment_id: appointmentId });
         if (invoiceExist) {
             return res.status(400).json({ msg: 'Hóa đơn đã được tạo' });
@@ -264,7 +268,7 @@ exports.generateInvoice = async (req, res) => {
         // Tạo hóa đơn mới
         const invoice = new Invoice({
             customer_id: appointment.customer_id,
-            employee_id: employeeId,
+            employee_id: emp._id,
             appointment_id: appointmentId,
             promotion_header_ids: promotionHeader.length !== 0 ? promotionHeader : [],
             total_amount: totalAmount,
