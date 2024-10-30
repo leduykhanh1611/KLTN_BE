@@ -400,7 +400,9 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
         if (!savedInvoice || savedInvoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
         }
-
+        if (savedInvoice.status !== 'paid') {
+            return res.status(400).json({ msg: 'Hóa đơn chưa được thanh toán' });
+        }
         const invoiceDetailList = await InvoiceDetail.find({ invoice_id: invoiceId, is_deleted: false })
             .populate('service_id')
             .lean();
