@@ -468,7 +468,7 @@ exports.getInvoice = async (req, res) => {
        
 
         // Lấy lại thông tin hóa đơn đã lưu, bao gồm các thông tin liên quan
-        const savedInvoice = await Invoice.findById(invoice._id)
+        const savedInvoice = await Invoice.findById(invoiceId)
             .populate('customer_id')
             .populate('employee_id')
             .populate('appointment_id')
