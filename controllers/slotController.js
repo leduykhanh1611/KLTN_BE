@@ -72,7 +72,7 @@ exports.softDeleteSlot = async (req, res) => {
 // lấy tất cả slot
 exports.getAllSlots = async (req, res) => {
   try {
-    const slots = await Slot.find({ is_deleted: false });
+    const slots = await Slot.find({ is_deleted: false }).sort({ createdAt: -1 });
     res.json(slots);
   } catch (err) {
     console.error('Lỗi khi lấy danh sách slot:', err.message);
