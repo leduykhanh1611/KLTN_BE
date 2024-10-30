@@ -17,11 +17,11 @@ const InvoiceSchema = new mongoose.Schema(
       ref: 'Appointment',
       required: true,
     },
-    promotion_header_id: {
+    promotion_header_ids: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'PromotionLine',
-      default: null,
-    },
+      default: [],
+    }],
     total_amount: {
       type: Number,
       required: true,

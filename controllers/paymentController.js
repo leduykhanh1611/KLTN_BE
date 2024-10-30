@@ -92,10 +92,10 @@ exports.createPaymentLink = async (req, res) => {
 // Xuất hóa đơn thanh toán cho khách hàng
 exports.generateInvoice = async (req, res) => {
     const { appointmentId, employeeId } = req.params;
-
     try {
+        console.log('Bắt đầu tạo hóa đơn...');
         // Tìm lịch hẹn theo ID
-        const appointment = await Appointment.findById(appointmentId).populate('vehicle_id');
+        const appointment = await Appointment.findById(appointmentId).populate('vehicle_id customer_id').lean();
         if (!appointment || appointment.is_deleted || appointment.status !== 'completed') {
             return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn đã hoàn thành' });
         }
@@ -104,7 +104,7 @@ exports.generateInvoice = async (req, res) => {
         const appointmentServices = await AppointmentService.find({
             appointment_id: appointmentId,
             is_deleted: false,
-        }).populate('price_line_id customer_id');
+        }).populate('price_line_id').lean();
 
         if (appointmentServices.length === 0) {
             return res.status(400).json({ msg: 'Không có dịch vụ nào liên quan đến lịch hẹn' });
@@ -136,7 +136,7 @@ exports.generateInvoice = async (req, res) => {
         let discountAmount = 0;
         let fixedDiscount = 0;
         let percentageDiscount = 0;
-        let promotionHeader = [];
+
 
         // Kiểm tra các chương trình khuyến mãi áp dụng cho khách hàng
         const activePromotions = await PromotionLine.find({
@@ -154,24 +154,102 @@ exports.generateInvoice = async (req, res) => {
             },
         });
 
+        // Tạo một Map để lưu trữ các promotion_header_id đã thêm và thông tin của promotion line đã được thêm
+        const addedPromotionHeaders = new Map();
+        const promotionHeader = []; // Danh sách các promotion line id đã được áp dụng
+
         // Áp dụng cả khuyến mãi cố định và khuyến mãi theo phần trăm nếu có
         for (let promotion of activePromotions) {
-            // Áp dụng khuyến mãi nếu khách hàng đủ điều kiện (ví dụ: hạng khách hàng phù hợp)  
+            const promotionHeaderId = promotion.promotion_header_id.toString();
+
             if (promotion.discount_type == 2) {
+                // Tìm kiếm các promotion detail tương ứng với promotion line
                 const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotion._id, is_deleted: false });
-                if (promotionDetails.min_order_value <= totalAmount) {
-                    fixedDiscount += promotion.discount_value;
-                    promotionHeader.push(promotionDetails._id);
+
+                // Tìm promotionDetail có giá trị min_order_value cao nhất nhưng nhỏ hơn hoặc bằng totalAmount
+                const validPromotionDetails = promotionDetails
+                    .filter(detail => detail.min_order_value <= totalAmount) // Chỉ lấy những promotion phù hợp
+                    .sort((a, b) => b.discount_value - a.discount_value); // Sắp xếp theo discount_value giảm dần
+
+                if (validPromotionDetails.length > 0) {
+                    const bestPromotionDetail = validPromotionDetails[0]; // Lấy dòng có discount_value cao nhất
+
+                    // Nếu promotion_header_id đã tồn tại trong Map
+                    if (addedPromotionHeaders.has(promotionHeaderId)) {
+                        // So sánh với promotion line đã lưu để quyết định thay thế hay không
+                        const existingPromotion = addedPromotionHeaders.get(promotionHeaderId);
+                        if (bestPromotionDetail.min_order_value > existingPromotion.min_order_value) {
+                            // Thay thế nếu min_order_value của khuyến mãi mới lớn hơn khuyến mãi đã lưu
+                            fixedDiscount = fixedDiscount - existingPromotion.discount_value + bestPromotionDetail.discount_value;
+
+                            // Cập nhật promotion header list và Map với khuyến mãi mới tốt nhất
+                            promotionHeader[promotionHeader.indexOf(existingPromotion.promotion_line_id)] = promotion._id;
+                            addedPromotionHeaders.set(promotionHeaderId, {
+                                ...promotion,
+                                promotion_line_id: promotion._id,
+                                discount_value: bestPromotionDetail.discount_value,
+                                min_order_value: bestPromotionDetail.min_order_value,
+                            });
+                        }
+                    } else {
+                        // Nếu promotion_header_id chưa tồn tại, thêm mới khuyến mãi
+                        fixedDiscount += bestPromotionDetail.discount_value;
+                        promotionHeader.push(promotion._id);
+                        addedPromotionHeaders.set(promotionHeaderId, {
+                            ...promotion,
+                            promotion_line_id: promotion._id,
+                            discount_value: bestPromotionDetail.discount_value,
+                            min_order_value: bestPromotionDetail.min_order_value,
+                        });
+                    }
                 }
             } else if (promotion.discount_type == 1) {
                 const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotion._id, is_deleted: false });
-                const calculatedPercentageDiscount = totalAmount * (promotionDetails.discount_value / 100);
-                if (promotionDetails.applicable_rank_id == appointmentServices.customer_id.customer_rank_id) {
-                    percentageDiscount = calculatedPercentageDiscount;
-                    promotionHeader.push(promotionDetails._id);
+
+                // Tìm promotion detail phù hợp với hạng khách hàng và có discount_value cao nhất
+                const validPromotionDetails = promotionDetails
+                    .filter(detail =>
+                        detail.applicable_rank_id &&
+                        detail.applicable_rank_id.equals(appointment.customer_id.customer_rank_id)
+                    )
+                    .sort((a, b) => b.discount_value - a.discount_value); // Sắp xếp theo discount_value giảm dần
+
+                if (validPromotionDetails.length > 0) {
+                    const bestPromotionDetail = validPromotionDetails[0];
+                    const calculatedPercentageDiscount = totalAmount * (bestPromotionDetail.discount_value / 100);
+
+                    // Nếu promotion_header_id đã tồn tại trong Map
+                    if (addedPromotionHeaders.has(promotionHeaderId)) {
+                        // So sánh và thay thế nếu discount_value cao hơn khuyến mãi hiện tại
+                        const existingPromotion = addedPromotionHeaders.get(promotionHeaderId);
+                        if (bestPromotionDetail.discount_value > existingPromotion.discount_value) {
+                            percentageDiscount = percentageDiscount - (totalAmount * (existingPromotion.discount_value / 100)) + calculatedPercentageDiscount;
+
+                            // Cập nhật promotion header list và Map với khuyến mãi mới tốt nhất
+                            promotionHeader[promotionHeader.indexOf(existingPromotion.promotion_line_id)] = promotion._id;
+                            addedPromotionHeaders.set(promotionHeaderId, {
+                                ...promotion,
+                                promotion_line_id: promotion._id,
+                                discount_value: bestPromotionDetail.discount_value,
+                                min_order_value: bestPromotionDetail.min_order_value,
+                            });
+                        }
+                    } else {
+                        // Nếu promotion_header_id chưa tồn tại, thêm mới khuyến mãi
+                        percentageDiscount += calculatedPercentageDiscount;
+                        promotionHeader.push(promotion._id);
+                        addedPromotionHeaders.set(promotionHeaderId, {
+                            ...promotion,
+                            promotion_line_id: promotion._id,
+                            discount_value: bestPromotionDetail.discount_value,
+                            min_order_value: bestPromotionDetail.min_order_value,
+                        });
+                    }
                 }
             }
         }
+
+
 
         // Tính tổng số tiền giảm giá
         discountAmount = fixedDiscount + percentageDiscount;
@@ -182,12 +260,12 @@ exports.generateInvoice = async (req, res) => {
         // Tạo hóa đơn mới
         const invoice = new Invoice({
             customer_id: appointment.customer_id,
-            employee_id: employeeId, // Sẽ cập nhật sau nếu cần
+            employee_id: employeeId,
             appointment_id: appointmentId,
-            promotion_header_id: promotionHeader.length != 0 ? promotionHeader : null, // Gán khuyến mãi nếu có
+            promotion_header_ids: promotionHeader.length !== 0 ? promotionHeader : [],
             total_amount: totalAmount,
-            discount_amount: discountAmount,
-            final_amount: finalAmount,
+            discount_amount: discountAmount || 0,
+            final_amount: finalAmount || totalAmount,
             status: 'pending',
             is_deleted: false,
         });
@@ -211,7 +289,7 @@ exports.generateInvoice = async (req, res) => {
             .populate('customer_id')
             .populate('employee_id')
             .populate('appointment_id')
-            .populate('promotion_header_id')
+            .populate('promotion_header_ids')
             .lean();
 
         // Lấy chi tiết hóa đơn
@@ -222,14 +300,30 @@ exports.generateInvoice = async (req, res) => {
         // Gán chi tiết hóa đơn vào đối tượng hóa đơn
         savedInvoice.details = invoiceDetailList;
 
+        // Lấy thông tin PromotionDetail từ tất cả PromotionLine
+        if (savedInvoice.promotion_header_ids && savedInvoice.promotion_header_ids.length > 0) {
+            const promotionLineIds = savedInvoice.promotion_header_ids.map(line => line._id);
+
+            const promotionDetails = await PromotionDetail.find({
+                promotion_line_id: { $in: promotionLineIds },
+                is_deleted: false,
+            }).lean();
+
+            // Gán các PromotionDetail vào PromotionLine tương ứng
+            savedInvoice.promotion_header_ids.forEach(line => {
+                line.details = promotionDetails.filter(detail => detail.promotion_line_id.toString() === line._id.toString());
+            });
+        }
+
         // Trả về hóa đơn đầy đủ
         res.status(201).json({
             msg: 'Hóa đơn đã được tạo thành công',
             invoice: savedInvoice,
         });
+
     } catch (err) {
-        console.error('Lỗi khi tạo hóa đơn:', err.message);
-        res.status(500).send('Lỗi máy chủ');
+        console.log('Lỗi khi tạo hóa đơn:', err.message);
+        res.status(500).send('Lỗi máy chủ thanh toán' + err.message);
     }
 };
 // Xử lý webhook trả về kết quả thanh toán
