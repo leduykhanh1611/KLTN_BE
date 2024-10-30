@@ -19,7 +19,7 @@ const InvoiceSchema = new mongoose.Schema(
     },
     promotion_header_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'PromotionHeader',
+      ref: 'PromotionLine',
       default: null,
     },
     total_amount: {

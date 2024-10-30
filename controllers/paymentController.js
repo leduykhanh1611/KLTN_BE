@@ -104,7 +104,7 @@ exports.generateInvoice = async (req, res) => {
         const appointmentServices = await AppointmentService.find({
             appointment_id: appointmentId,
             is_deleted: false,
-        }).populate('price_line_id');
+        }).populate('price_line_id customer_id');
 
         if (appointmentServices.length === 0) {
             return res.status(400).json({ msg: 'Không có dịch vụ nào liên quan đến lịch hẹn' });
@@ -166,7 +166,7 @@ exports.generateInvoice = async (req, res) => {
             } else if (promotion.discount_type == 1) {
                 const promotionDetails = await PromotionDetail.find({ promotion_line_id: promotion._id, is_deleted: false });
                 const calculatedPercentageDiscount = totalAmount * (promotionDetails.discount_value / 100);
-                if (calculatedPercentageDiscount > percentageDiscount) {
+                if (promotionDetails.applicable_rank_id == appointmentServices.customer_id.customer_rank_id) {
                     percentageDiscount = calculatedPercentageDiscount;
                     promotionHeader.push(promotionDetails._id);
                 }
