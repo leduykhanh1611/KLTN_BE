@@ -343,15 +343,16 @@ exports.filterAppointmentsByDate = async (req, res) => {
 // Lấy lịch hẹn đã hoàn thành, nếu lịch hẹn nào đã lên hóa đơn thì lấy thêm cả thông tin hóa đơn
 exports.getCompletedAppointments = async (req, res) => {
   try {
-    // Lấy tất cả các lịch hẹn có trạng thái "completed"
+    // Lấy tất cả các lịch hẹn có trạng thái "completed" và sắp xếp theo appointment_datetime từ ngày gần nhất đến ngày xa nhất
     const appointments = await Appointment.find({ status: 'completed', is_deleted: false })
       .populate('customer_id')
       .populate('vehicle_id')
       .populate('slot_id')
+      .sort({ appointment_datetime: -1 })
       .lean();
 
     if (appointments.length === 0) {
-      return res.json(appointments);;
+      return res.json(appointments);
     }
 
     // Tìm hóa đơn liên quan đến các lịch hẹn
@@ -378,6 +379,7 @@ exports.getCompletedAppointments = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
 // Cập nhật lịch hẹn và các dịch vụ liên quan
 exports.updateAppointment = async (req, res) => {
   const { appointmentId } = req.params;

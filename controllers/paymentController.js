@@ -52,8 +52,8 @@ exports.createPaymentLink = async (req, res) => {
                 quantity: detail.quantity,
                 price: detail.price,
             })),
-            cancelUrl: 'https://auto-tech-mu.vercel.app/admin',
-            returnUrl: 'https://auto-tech-mu.vercel.app/admin',
+            cancelUrl: 'https://auto-tech-mu.vercel.app/appointments/completed',
+            returnUrl: 'https://auto-tech-mu.vercel.app/appointments/completed',
         };
 
         const paymentLinkRes = await payOS.createPaymentLink(paymentBody);
