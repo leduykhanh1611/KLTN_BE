@@ -66,7 +66,7 @@ router.post('/webhook', async (req, res) => {
 // @route   GET /api/payments/invoice/:invoiceId
 // @desc    Lấy thông tin hóa đơn
 // @access  Private (phải đăng nhập)
-router.get('/invoice/:invoiceId', auth, getInvoice);
+router.get('/invoice/:invoiceId',  getInvoice);
 
 // @route   GET /api/payments/invoice/:invoiceId/pdf
 // @desc    Lấy thông tin hóa đơn và in ra bản PDF

@@ -93,13 +93,13 @@ exports.createPaymentLink = async (req, res) => {
 exports.generateInvoice = async (req, res) => {
     const { appointmentId, employeeId } = req.params;
     try {
-        
+
         // Tìm lịch hẹn theo ID
         const appointment = await Appointment.findById(appointmentId).populate('vehicle_id customer_id').lean();
         if (!appointment || appointment.is_deleted || appointment.status !== 'completed') {
             return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn đã hoàn thành' });
         }
-        const emp = await employee.findById(employeeId);    
+        const emp = await employee.findById(employeeId);
         if (!emp || emp.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy nhân viên' });
         }
@@ -386,8 +386,6 @@ exports.handlePaymentWebhook = async (req, res) => {
     // }
 };
 
-
-
 exports.getInvoiceAndGeneratePDF = async (req, res) => {
     const { invoiceId } = req.params;
 
@@ -398,6 +396,10 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             .populate('appointment_id')
             .populate('promotion_header_ids')
             .lean();
+
+        if (!savedInvoice || savedInvoice.is_deleted) {
+            return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
+        }
 
         const invoiceDetailList = await InvoiceDetail.find({ invoice_id: invoiceId, is_deleted: false })
             .populate('service_id')
@@ -431,8 +433,43 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
 
         const fontPath = path.join(__dirname, '../fonts/Roboto-Regular.ttf');
         doc.font(fontPath);
+        const logoPath = path.join(__dirname, '../fonts/logo.png');
 
-        doc.fontSize(20).text('Hóa đơn thanh toán', { align: 'center' });
+        // Set gray background color
+        doc.rect(0, 0, doc.page.width, doc.page.height)
+            .fillColor('#e0e0e0')  // Light gray color
+            .fill();
+
+        // Add watermark logos in the four corners of the page
+        const logoWidth = doc.page.width * 0.15;
+        const logoHeight = logoWidth;
+        const logoOpacity = 0.05;
+
+        // Top-left corner
+        doc.image(logoPath, 20, 20, {
+            width: logoWidth,
+            opacity: logoOpacity
+        });
+
+        // Top-right corner
+        doc.image(logoPath, doc.page.width - logoWidth - 20, 20, {
+            width: logoWidth,
+            opacity: logoOpacity
+        });
+
+        // Bottom-left corner
+        doc.image(logoPath, 20, doc.page.height - logoHeight - 20, {
+            width: logoWidth,
+            opacity: logoOpacity
+        });
+
+        // Bottom-right corner
+        doc.image(logoPath, doc.page.width - logoWidth - 20, doc.page.height - logoHeight - 20, {
+            width: logoWidth,
+            opacity: logoOpacity
+        });
+
+        doc.fontSize(20).fillColor('black').text('Hóa đơn thanh toán', { align: 'center' });
         doc.moveDown();
         const customer = savedInvoice.customer_id;
         doc.fontSize(12)
@@ -440,14 +477,24 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             .text(`Email: ${customer.email}`)
             .text(`Địa chỉ: ${customer.address}`)
             .text(`Số điện thoại: ${customer.phone_number}`)
+            .text(`Loại xe: ${customer.phone_number}`)
             .moveDown();
 
         if (savedInvoice.employee_id) {
             doc.text(`Nhân viên xử lý: ${savedInvoice.employee_id.name}`);
         }
         if (savedInvoice.appointment_id) {
-            doc.text(`Thông tin lịch hẹn: ${savedInvoice.appointment_id.appointment_datetime}`)
-                .moveDown();
+            const appointmentDate = new Date(savedInvoice.appointment_id.appointment_datetime);
+            const formattedDate = appointmentDate.toLocaleString('vi-VN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+            });
+
+            doc.text(`Thời gian: ${formattedDate}`).moveDown();
         }
 
         // Define table width and start position
@@ -458,53 +505,37 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
 
         // Define column widths as a percentage of tableWidth for the service details table
         const colWidths = [
-            tableWidth * 0.4, // Tên dịch vụ
-            tableWidth * 0.1, // Số lượng (SL)
-            tableWidth * 0.25, // Đơn giá
-            tableWidth * 0.25, // Thành tiền
+            tableWidth * 0.4,
+            tableWidth * 0.1,
+            tableWidth * 0.25,
+            tableWidth * 0.25,
         ];
 
-        // Function to draw a table row for services
         const drawRow = (y, rowData) => {
             const cellData = [rowData.name, rowData.quantity, rowData.unitPrice, rowData.totalPrice];
-
             let x = startX;
             for (let i = 0; i < cellData.length; i++) {
                 const cellWidth = colWidths[i];
-                
-                // Draw the cell border
                 doc.rect(x, y, cellWidth, rowHeight).stroke();
-
-                // Draw the text within the cell
                 doc.text(cellData[i], x + cellPadding, y + cellPadding, {
                     width: cellWidth - cellPadding * 2,
                     align: 'center'
                 });
-
-                // Move x to the next column start
                 x += cellWidth;
             }
         };
 
         // Draw Service Details Table
-        doc.fontSize(14).text('Chi tiết dịch vụ', { underline: true, align: 'center' });
         doc.moveDown();
-
-        // Table starting position
         let currentY = doc.y;
-
-        // Draw headers
         drawRow(currentY, {
             name: 'Tên dịch vụ',
             quantity: 'SL',
             unitPrice: 'Đơn giá',
             totalPrice: 'Thành tiền'
         });
-
-        // Move to the next row position
         currentY += rowHeight;
 
-        // Draw each row for service details
         savedInvoice.details.forEach(detail => {
             drawRow(currentY, {
                 name: detail.service_id.name,
@@ -515,62 +546,45 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             currentY += rowHeight;
         });
 
-        // Promotion Table Column Widths (adjusted to fit text better)
         const promotionColWidths = [
-            tableWidth * 0.55, // Tên khuyến mãi (increased to fit longer text)
-            tableWidth * 0.2,  // Loại giảm
-            tableWidth * 0.25, // Giá trị
+            tableWidth * 0.55,
+            tableWidth * 0.2,
+            tableWidth * 0.25,
         ];
 
         const drawPromotionRow = (y, rowData) => {
             const cellData = [rowData.name, rowData.discountType, rowData.discountValue];
-
             let x = startX;
             for (let i = 0; i < cellData.length; i++) {
                 const cellWidth = promotionColWidths[i];
-
-                // Draw the cell border
                 doc.rect(x, y, cellWidth, rowHeight).stroke();
-
-                // Draw the text within the cell
                 doc.text(cellData[i], x + cellPadding, y + cellPadding, {
                     width: cellWidth - cellPadding * 2,
                     align: 'center'
                 });
-
-                // Move x to the next column start
                 x += cellWidth;
             }
         };
 
         // Draw Promotion Details Table
-        doc.moveDown(1);
-        doc.fontSize(14).text('Khuyến mãi', { underline: true, align: 'center' });
-        doc.moveDown();
-
-        // Start position for promotions table
+        doc.moveDown(2);
         currentY = doc.y;
-
-        // Draw headers for promotion table
         drawPromotionRow(currentY, {
             name: 'Tên khuyến mãi',
             discountType: 'Loại giảm',
             discountValue: 'Giá trị'
         });
-
-        // Move to the next row position
         currentY += rowHeight;
 
-        // Draw each row for promotions
         savedInvoice.promotion_header_ids.forEach(promotion => {
             const discountDetail = promotion.details[0];
-            const discountValue = discountDetail.discount_type === 1
+            const discountValue = promotion.discount_type == 1
                 ? `${discountDetail.discount_value}%`
                 : `${discountDetail.discount_value} VND`;
 
             drawPromotionRow(currentY, {
                 name: promotion.description,
-                discountType: discountDetail.discount_type === 1 ? 'Phần trăm' : 'Trực tiếp',
+                discountType: promotion.discount_type === 1 ? 'Phần trăm' : 'Trực tiếp',
                 discountValue: discountValue
             });
 
@@ -579,18 +593,31 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
 
         // Total Summary Section
         doc.moveDown(1)
-            .fontSize(12)
-            .text(`Tổng tiền: ${savedInvoice.total_amount}VND`, { align: 'right' })
-            .text(`Giảm giá: ${savedInvoice.discount_amount}VND`, { align: 'right' })
-            .fontSize(14).text(`Thành tiền: ${savedInvoice.final_amount}VND`, { align: 'right', bold: true });
+            .fontSize(13)
+            .text(`Tổng tiền: ${savedInvoice.total_amount} VND`, { align: 'left', width: doc.page.width * 0.3 })
+            .moveDown(0.5)
+            .text(`Giảm giá: ${savedInvoice.discount_amount} VND`, { align: 'left', width: doc.page.width * 0.3 })
+            .moveDown(0.5)
+            .fontSize(14)
+            .text(`Thành tiền: ${savedInvoice.final_amount} VND`, { align: 'left', width: doc.page.width * 0.3, bold: true });
+
+        // Contact Information at the bottom of the page
+        const centerX = doc.page.width / 10;
+
+        // Move down a little to position the contact info
+        doc.moveDown(2)
+            .fontSize(10)
+            .text('Liên hệ với chúng tôi', centerX, doc.y, { align: 'center' })
+            .text('319 C16 Lý Thường Kiệt, Phường 15, Quận 11, Tp.HCM', centerX, doc.y + 15, { align: 'center' })
+            .text('078 201 236', centerX, doc.y + 15, { align: 'center' })
+            .text('dichvul&k@gmail.com', centerX, doc.y + 15, { align: 'center' });
 
         doc.end();
     } catch (err) {
         console.error('Lỗi khi tạo PDF hóa đơn:', err.message);
-        res.status(500).send('Lỗi máy chủ');
+        res.status(500).send('Lỗi máy chủ ở in hóa đơn: ' + err.message);
     }
 };
-
 // lấy thông tin hóa đơn
 exports.getInvoice = async (req, res) => {
     const { invoiceId } = req.params;
