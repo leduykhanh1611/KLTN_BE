@@ -465,19 +465,48 @@ exports.getInvoice = async (req, res) => {
     const { invoiceId } = req.params;
 
     try {
-        // Tìm hóa đơn theo ID
-        const invoice = await Invoice.findById(invoiceId).populate('customer_id promotion_header_id')
+       
+
+        // Lấy lại thông tin hóa đơn đã lưu, bao gồm các thông tin liên quan
+        const savedInvoice = await Invoice.findById(invoice._id)
+            .populate('customer_id')
+            .populate('employee_id')
+            .populate('appointment_id')
+            .populate('promotion_header_ids')
+            .lean();
+
         if (!invoice || invoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
         }
 
         // Lấy chi tiết hóa đơn
-        const invoiceDetails = await InvoiceDetail.find({
-            invoice_id: invoiceId,
-            is_deleted: false,
-        }).populate('service_id');
+        const invoiceDetailList = await InvoiceDetail.find({ invoice_id: invoice._id, is_deleted: false })
+            .populate('service_id')
+            .lean();
 
-        res.status(200).json({ invoice, invoiceDetails });
+        // Gán chi tiết hóa đơn vào đối tượng hóa đơn
+        savedInvoice.details = invoiceDetailList;
+
+        // Lấy thông tin PromotionDetail từ tất cả PromotionLine
+        if (savedInvoice.promotion_header_ids && savedInvoice.promotion_header_ids.length > 0) {
+            const promotionLineIds = savedInvoice.promotion_header_ids.map(line => line._id);
+
+            const promotionDetails = await PromotionDetail.find({
+                promotion_line_id: { $in: promotionLineIds },
+                is_deleted: false,
+            }).lean();
+
+            // Gán các PromotionDetail vào PromotionLine tương ứng
+            savedInvoice.promotion_header_ids.forEach(line => {
+                line.details = promotionDetails.filter(detail => detail.promotion_line_id.toString() === line._id.toString());
+            });
+        }
+
+        // Trả về hóa đơn đầy đủ
+        res.status(201).json({
+            msg: 'Hóa đơn đã được tạo thành công',
+            invoice: savedInvoice,
+        });
     } catch (err) {
         console.error('Lỗi khi lấy thông tin hóa đơn:', err.message);
         res.status(500).send('Lỗi máy chủ');
