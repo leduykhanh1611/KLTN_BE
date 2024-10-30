@@ -386,30 +386,39 @@ exports.handlePaymentWebhook = async (req, res) => {
     // }
 };
 
-// Lấy thông tin hóa đơn và in ra bản PDF
+
+
 exports.getInvoiceAndGeneratePDF = async (req, res) => {
     const { invoiceId } = req.params;
 
     try {
-        // Tìm hóa đơn theo ID
-        const invoice = await Invoice.findById(invoiceId).populate('customer_id promotion_header_id')
-        if (!invoice || invoice.is_deleted) {
-            return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
-        }
-        if (invoice.status !== 'paid') {
-            return res.status(400).json({ msg: 'Hóa đơn chưa được thanh toán' });
-        }
-        const emp = await employee.findById(invoice.employee_id);
-        // Lấy chi tiết hóa đơn
-        const invoiceDetails = await InvoiceDetail.find({
-            invoice_id: invoiceId,
-            is_deleted: false,
-        }).populate('service_id');
+        const savedInvoice = await Invoice.findById(invoiceId)
+            .populate('customer_id')
+            .populate('employee_id')
+            .populate('appointment_id')
+            .populate('promotion_header_ids')
+            .lean();
 
-        // Tạo PDF hóa đơn
+        const invoiceDetailList = await InvoiceDetail.find({ invoice_id: invoiceId, is_deleted: false })
+            .populate('service_id')
+            .lean();
+        savedInvoice.details = invoiceDetailList;
+
+        if (savedInvoice.promotion_header_ids && savedInvoice.promotion_header_ids.length > 0) {
+            const promotionLineIds = savedInvoice.promotion_header_ids.map(line => line._id);
+
+            const promotionDetails = await PromotionDetail.find({
+                promotion_line_id: { $in: promotionLineIds },
+                is_deleted: false,
+            }).lean();
+
+            savedInvoice.promotion_header_ids.forEach(line => {
+                line.details = promotionDetails.filter(detail => detail.promotion_line_id.toString() === line._id.toString());
+            });
+        }
+
         const doc = new PDFDocument();
         const buffers = [];
-
         doc.on('data', buffers.push.bind(buffers));
         doc.on('end', () => {
             const pdfData = Buffer.concat(buffers);
@@ -420,43 +429,161 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             res.send(pdfData);
         });
 
-        // Đường dẫn tới file font hỗ trợ tiếng Việt
         const fontPath = path.join(__dirname, '../fonts/Roboto-Regular.ttf');
         doc.font(fontPath);
 
-        // Thông tin tiêu đề hóa đơn
         doc.fontSize(20).text('Hóa đơn thanh toán', { align: 'center' });
         doc.moveDown();
+        const customer = savedInvoice.customer_id;
+        doc.fontSize(12)
+            .text(`Tên khách hàng: ${customer.name}`)
+            .text(`Email: ${customer.email}`)
+            .text(`Địa chỉ: ${customer.address}`)
+            .text(`Số điện thoại: ${customer.phone_number}`)
+            .moveDown();
 
-        // Thông tin khách hàng
-        doc.fontSize(12).text(`Tên khách hàng: ${invoice.customer_id.name}`);
-        doc.text(`Email: ${invoice.customer_id.email}`);
-        doc.text(`Ngày xuất hóa đơn: ${new Date().toLocaleDateString()}`);
-        doc.text(`Nhân viên: ${emp.name}`);
+        if (savedInvoice.employee_id) {
+            doc.text(`Nhân viên xử lý: ${savedInvoice.employee_id.name}`);
+        }
+        if (savedInvoice.appointment_id) {
+            doc.text(`Thông tin lịch hẹn: ${savedInvoice.appointment_id.appointment_datetime}`)
+                .moveDown();
+        }
 
+        // Define table width and start position
+        const tableWidth = doc.page.width * 0.8;
+        const startX = (doc.page.width - tableWidth) / 2;
+        const cellPadding = 5;
+        const rowHeight = 25;
+
+        // Define column widths as a percentage of tableWidth for the service details table
+        const colWidths = [
+            tableWidth * 0.4, // Tên dịch vụ
+            tableWidth * 0.1, // Số lượng (SL)
+            tableWidth * 0.25, // Đơn giá
+            tableWidth * 0.25, // Thành tiền
+        ];
+
+        // Function to draw a table row for services
+        const drawRow = (y, rowData) => {
+            const cellData = [rowData.name, rowData.quantity, rowData.unitPrice, rowData.totalPrice];
+
+            let x = startX;
+            for (let i = 0; i < cellData.length; i++) {
+                const cellWidth = colWidths[i];
+                
+                // Draw the cell border
+                doc.rect(x, y, cellWidth, rowHeight).stroke();
+
+                // Draw the text within the cell
+                doc.text(cellData[i], x + cellPadding, y + cellPadding, {
+                    width: cellWidth - cellPadding * 2,
+                    align: 'center'
+                });
+
+                // Move x to the next column start
+                x += cellWidth;
+            }
+        };
+
+        // Draw Service Details Table
+        doc.fontSize(14).text('Chi tiết dịch vụ', { underline: true, align: 'center' });
         doc.moveDown();
 
-        // Thông tin chi tiết hóa đơn
-        invoiceDetails.forEach(detail => {
-            doc.text(`Dịch vụ: ${detail.service_id.name}`);
-            doc.text(`Giá: ${detail.price} VND`);
-            doc.text(`Số lượng: ${detail.quantity}`);
-            doc.moveDown();
+        // Table starting position
+        let currentY = doc.y;
+
+        // Draw headers
+        drawRow(currentY, {
+            name: 'Tên dịch vụ',
+            quantity: 'SL',
+            unitPrice: 'Đơn giá',
+            totalPrice: 'Thành tiền'
         });
 
-        doc.moveDown();
+        // Move to the next row position
+        currentY += rowHeight;
 
-        invoice.promotion_header_id.forEach(promotion => {
-            doc.text(`Khuyến mãi: ${promotion.name}`);
-            doc.text(`Nội dung: ${promotion.description}`);
+        // Draw each row for service details
+        savedInvoice.details.forEach(detail => {
+            drawRow(currentY, {
+                name: detail.service_id.name,
+                quantity: detail.quantity,
+                unitPrice: `${detail.price} VND`,
+                totalPrice: `${detail.price * detail.quantity} VND`
+            });
+            currentY += rowHeight;
         });
-        doc.moveDown();
-        // Tổng tiền
-        doc.text(`Tổng tiền: ${invoice.total_amount} VND`);
-        doc.text(`Giảm giá: ${invoice.discount_amount} VND`);
-        doc.text(`Thành tiền: ${invoice.final_amount} VND`, { bold: true });
 
-        // Kết thúc và lưu file PDF
+        // Promotion Table Column Widths (adjusted to fit text better)
+        const promotionColWidths = [
+            tableWidth * 0.55, // Tên khuyến mãi (increased to fit longer text)
+            tableWidth * 0.2,  // Loại giảm
+            tableWidth * 0.25, // Giá trị
+        ];
+
+        const drawPromotionRow = (y, rowData) => {
+            const cellData = [rowData.name, rowData.discountType, rowData.discountValue];
+
+            let x = startX;
+            for (let i = 0; i < cellData.length; i++) {
+                const cellWidth = promotionColWidths[i];
+
+                // Draw the cell border
+                doc.rect(x, y, cellWidth, rowHeight).stroke();
+
+                // Draw the text within the cell
+                doc.text(cellData[i], x + cellPadding, y + cellPadding, {
+                    width: cellWidth - cellPadding * 2,
+                    align: 'center'
+                });
+
+                // Move x to the next column start
+                x += cellWidth;
+            }
+        };
+
+        // Draw Promotion Details Table
+        doc.moveDown(1);
+        doc.fontSize(14).text('Khuyến mãi', { underline: true, align: 'center' });
+        doc.moveDown();
+
+        // Start position for promotions table
+        currentY = doc.y;
+
+        // Draw headers for promotion table
+        drawPromotionRow(currentY, {
+            name: 'Tên khuyến mãi',
+            discountType: 'Loại giảm',
+            discountValue: 'Giá trị'
+        });
+
+        // Move to the next row position
+        currentY += rowHeight;
+
+        // Draw each row for promotions
+        savedInvoice.promotion_header_ids.forEach(promotion => {
+            const discountDetail = promotion.details[0];
+            const discountValue = discountDetail.discount_type === 1
+                ? `${discountDetail.discount_value}%`
+                : `${discountDetail.discount_value} VND`;
+
+            drawPromotionRow(currentY, {
+                name: promotion.description,
+                discountType: discountDetail.discount_type === 1 ? 'Phần trăm' : 'Trực tiếp',
+                discountValue: discountValue
+            });
+
+            currentY += rowHeight;
+        });
+
+        // Total Summary Section
+        doc.moveDown(1)
+            .fontSize(12)
+            .text(`Tổng tiền: ${savedInvoice.total_amount}VND`, { align: 'right' })
+            .text(`Giảm giá: ${savedInvoice.discount_amount}VND`, { align: 'right' })
+            .fontSize(14).text(`Thành tiền: ${savedInvoice.final_amount}VND`, { align: 'right', bold: true });
+
         doc.end();
     } catch (err) {
         console.error('Lỗi khi tạo PDF hóa đơn:', err.message);
