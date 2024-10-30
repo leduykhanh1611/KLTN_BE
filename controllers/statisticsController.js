@@ -26,10 +26,42 @@ exports.getRevenueByTimePeriod = async (req, res) => {
             created_at: { $gte: startDate, $lte: endDate }
         });
 
-        // Tính tổng doanh thu
-        const totalRevenue = invoices.reduce((acc, invoice) => acc + invoice.final_amount, 0);
+        // Khởi tạo đối tượng lưu doanh thu từng tháng
+        const monthlyRevenue = {};
+        const startMonth = startDate.getMonth();
+        const endMonth = endDate.getMonth();
+        const startYear = startDate.getFullYear();
+        const endYear = endDate.getFullYear();
 
-        res.status(200).json({ totalRevenue });
+        for (let year = startYear; year <= endYear; year++) {
+            const start = year === startYear ? startMonth : 0;
+            const end = year === endYear ? endMonth : 11;
+            for (let month = start; month <= end; month++) {
+                const monthYear = `${month + 1}/${year}`;
+                monthlyRevenue[monthYear] = 0;
+            }
+        }
+
+        invoices.forEach(invoice => {
+            const month = new Date(invoice.created_at).toLocaleString('default', { month: 'numeric', year: 'numeric' });
+            monthlyRevenue[month] += invoice.final_amount;
+        });
+
+        // Tính mức tăng trưởng của tháng hiện tại so với tháng trước
+        const revenueArray = Object.entries(monthlyRevenue).sort((a, b) => {
+            const [monthA, yearA] = a[0].split('/').map(Number);
+            const [monthB, yearB] = b[0].split('/').map(Number);
+            return new Date(yearA, monthA - 1) - new Date(yearB, monthB - 1);
+        });
+
+        const growthRates = revenueArray.map(([, revenue], index) => {
+            if (index === 0) return { month: revenueArray[index][0], growth: null };
+            const previousRevenue = revenueArray[index - 1][1];
+            const growth = previousRevenue === 0 && revenue === 0 ? 0 : previousRevenue === 0 ? 100 : ((revenue - previousRevenue) / previousRevenue) * 100;
+            return { month: revenueArray[index][0], growth: growth.toFixed(2) + '%' };
+        });
+
+        res.status(200).json({ monthlyRevenue, growthRates });
     } catch (err) {
         console.error('Lỗi khi lấy doanh thu theo khoảng thời gian:', err.message);
         res.status(500).send('Lỗi máy chủ');
