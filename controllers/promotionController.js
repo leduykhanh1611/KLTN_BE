@@ -458,7 +458,7 @@ exports.updatePromotionDetail = async (req, res) => {
         if (service_id) promotionDetail.service_id = service_id;
         if (discount_value) promotionDetail.discount_value = discount_value;
         if (min_order_value) promotionDetail.min_order_value = min_order_value;
-        if (is_active !== undefined) promotionDetail.is_active = is_active;
+        if (is_active) promotionDetail.is_active = is_active;
 
         promotionDetail.updated_at = Date.now();
 
