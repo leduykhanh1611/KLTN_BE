@@ -165,7 +165,7 @@ exports.getCustomerByIdWithVehiclesForMobile = async (req, res) => {
     }
 
     // Tìm tất cả các xe liên quan đến khách hàng này
-    const vehicles = await Vehicle.find({ customer_id: req.params.id, is_deleted: false }).populate('vehicle_type_id');
+    const vehicles = await Vehicle.find({ customer_id: customer._id, is_deleted: false }).populate('vehicle_type_id');
 
     // Trả về thông tin khách hàng kèm danh sách xe
     res.json({
