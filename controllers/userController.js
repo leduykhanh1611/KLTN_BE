@@ -130,7 +130,7 @@ exports.activateCustomerAccountWithOtp = async (req, res) => {
 exports.getCustomerByIdWithVehicles = async (req, res) => {
   try {
     // Tìm khách hàng theo ID và kiểm tra is_deleted
-    const customer = await Customer.findOne({ user_id: req.params.id, is_deleted: false })
+    const customer = await Customer.findOne({ _id: req.params.id, is_deleted: false })
       .populate('customer_rank_id')
       .lean(); // Sử dụng lean() để dễ dàng chỉnh sửa dữ liệu sau khi truy vấn;
 
