@@ -478,12 +478,24 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
         }
         doc.moveDown();
         const customer = savedInvoice.customer_id;
-        doc.fontSize(12)
+        if(savedInvoice.status === 'back'){
+            doc.fontSize(12)
+            .text(`Tên khách hàng: ${customer.name}`)
+            .text(`Email: ${customer.email}`)
+            .text(`Địa chỉ: ${customer.address}`)
+            .text(`Số điện thoại: ${customer.phone_number}`)
+            .text('Lý do hoàn trả: ' + savedInvoice.note)
+            .moveDown();
+        } else {
+            doc.fontSize(12)
             .text(`Tên khách hàng: ${customer.name}`)
             .text(`Email: ${customer.email}`)
             .text(`Địa chỉ: ${customer.address}`)
             .text(`Số điện thoại: ${customer.phone_number}`)
             .moveDown();
+        }
+
+        
 
         if (savedInvoice.employee_id) {
             doc.text(`Nhân viên xử lý: ${savedInvoice.employee_id.name}`);
