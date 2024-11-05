@@ -3,7 +3,7 @@ const Payment = require('../models/Payment');
 const Invoice = require('../models/Invoice');
 const Cus = require('../models/Customer');
 const router = express.Router();
-const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF, getInvoice } = require('../controllers/paymentController');
+const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF, getInvoice, createRefundInvoice } = require('../controllers/paymentController');
 const auth = require('../middleware/auth');
 
 // @route   POST /api/payments/generate-invoice/:appointmentId
@@ -72,4 +72,9 @@ router.get('/invoice/:invoiceId', auth, getInvoice);
 // @desc    Lấy thông tin hóa đơn và in ra bản PDF
 // @access  Private (phải đăng nhập)
 router.get('/invoice/:invoiceId/pdf', getInvoiceAndGeneratePDF);
+
+// @route   POST /api/payments/refundInvoice
+// @desc    trả hóa đơn
+// @access  Public
+router.post('/refundInvoice',auth, createRefundInvoice);
 module.exports = router;

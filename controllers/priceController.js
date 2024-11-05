@@ -252,7 +252,7 @@ exports.updatePriceHeader = async (req, res) => {
     if (price_list_name) priceHeader.price_list_name = price_list_name;
     if (start_date) priceHeader.start_date = start_date;
     if (end_date) priceHeader.end_date = end_date;
-    if (is_active !== undefined) priceHeader.is_active = is_active;
+    if (is_active) priceHeader.is_active = is_active;
 
     priceHeader.updated_at = Date.now();
     await priceHeader.save();
@@ -280,7 +280,7 @@ exports.updatePriceLine = async (req, res) => {
     if (service_id) priceLine.service_id = service_id;
     if (vehicle_type_id) priceLine.vehicle_type_id = vehicle_type_id;
     if (price) priceLine.price = price;
-    if (is_active !== undefined) priceLine.is_active = is_active;
+    if (is_active) priceLine.is_active = is_active;
 
     priceLine.updated_at = Date.now();
     await priceLine.save();

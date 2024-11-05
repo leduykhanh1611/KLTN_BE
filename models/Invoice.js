@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { note } = require('pdfkit');
 
 const InvoiceSchema = new mongoose.Schema(
   {
@@ -37,11 +38,15 @@ const InvoiceSchema = new mongoose.Schema(
     status: {
       type: String,
       required: true,
-      enum: ['pending', 'paid', 'cancelled'], // Adjust as necessary
+      enum: ['pending', 'paid', 'cancelled', 'back'], // Adjust as necessary
     },
     is_deleted: {
       type: Boolean,
       default: false,
+    },
+    note: {
+      type: String,
+      default: '',
     },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }

@@ -385,7 +385,7 @@ exports.handlePaymentWebhook = async (req, res) => {
     //     res.status(500).send('Lỗi máy chủ');
     // }
 };
-
+// in hóa đơn
 exports.getInvoiceAndGeneratePDF = async (req, res) => {
     const { invoiceId } = req.params;
 
@@ -400,7 +400,7 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
         if (!savedInvoice || savedInvoice.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy hóa đơn' });
         }
-        if (savedInvoice.status !== 'paid') {
+        if (savedInvoice.status !== 'paid' && savedInvoice.status !== 'back') {
             return res.status(400).json({ msg: 'Hóa đơn chưa được thanh toán' });
         }
         const invoiceDetailList = await InvoiceDetail.find({ invoice_id: invoiceId, is_deleted: false })
@@ -471,7 +471,11 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             opacity: logoOpacity
         });
 
-        doc.fontSize(20).fillColor('black').text('Hóa đơn', { align: 'center' });
+        if (savedInvoice.status === 'back') {
+            doc.fillColor('red').fontSize(20).text('Hóa đơn hoàn trả', { align: 'center' });
+        } else {
+            doc.fontSize(20).fillColor('black').text('Hóa đơn', { align: 'center' });
+        }
         doc.moveDown();
         const customer = savedInvoice.customer_id;
         doc.fontSize(12)
@@ -592,16 +596,28 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
             currentY += rowHeight;
         });
 
-        // Total Summary Section
-        doc.moveDown(1)
-            .fontSize(13)
-            .text(`Tổng tiền: ${savedInvoice.total_amount} VND`, { align: 'left', width: doc.page.width * 0.3 })
-            .moveDown(0.5)
-            .text(`Giảm giá: ${savedInvoice.discount_amount} VND`, { align: 'left', width: doc.page.width * 0.3 })
-            .moveDown(0.5)
-            .fontSize(14)
-            .text(`Thành tiền: ${savedInvoice.final_amount} VND`, { align: 'left', width: doc.page.width * 0.3, bold: true });
 
+        // Total Summary Section
+        if (savedInvoice.status === 'back') {
+
+            doc.moveDown(2)
+                .fontSize(13)
+                .text(`Tổng tiền: ${savedInvoice.total_amount} VND`, { align: 'left', width: doc.page.width * 0.3 })
+                .moveDown(0.5)
+                .text(`Giảm giá: ${savedInvoice.discount_amount} VND`, { align: 'left', width: doc.page.width * 0.3 })
+                .moveDown(0.5)
+                .fontSize(14)
+                .text(`Hoàn trả: ${savedInvoice.final_amount} VND`, { align: 'left', width: doc.page.width * 0.3, bold: true });
+        } else {
+            doc.moveDown(1)
+                .fontSize(13)
+                .text(`Tổng tiền: ${savedInvoice.total_amount} VND`, { align: 'left', width: doc.page.width * 0.3 })
+                .moveDown(0.5)
+                .text(`Giảm giá: ${savedInvoice.discount_amount} VND`, { align: 'left', width: doc.page.width * 0.3 })
+                .moveDown(0.5)
+                .fontSize(14)
+                .text(`Thành tiền: ${savedInvoice.final_amount} VND`, { align: 'left', width: doc.page.width * 0.3, bold: true });
+        }
         // Contact Information at the bottom of the page
         const centerX = doc.page.width / 10;
 
@@ -616,7 +632,7 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
         doc.end();
     } catch (err) {
         console.error('Lỗi khi tạo PDF hóa đơn:', err.message);
-        res.status(500).send('Lỗi máy chủ ở in hóa đơn: ' + err.message);
+        res.status(500).send('Lỗi máy chủ ở in hóa đơ   n: ' + err.message);
     }
 };
 // lấy thông tin hóa đơn
@@ -667,5 +683,35 @@ exports.getInvoice = async (req, res) => {
     } catch (err) {
         console.error('Lỗi khi lấy thông tin hóa đơn:', err.message);
         res.status(500).send(`Lỗi máy chủ: ${err.message}`);
+    }
+};
+
+// tạo hóa đơn trả cho khách hàng
+exports.createRefundInvoice = async (req, res) => {
+    const { invoiceId, note } = req.body;
+    try {
+        // Tìm hóa đơn theo ID
+        const invoice = await Invoice.findById(invoiceId);
+        if (!invoice || invoice.is_deleted) {
+            return res.status(404).json({ msg: 'Không tìm thấy hóa đơn hợp lệ' });
+        }
+        if (invoice.status === 'cancelled') {
+            return res.status(400).json({ msg: 'Hóa đơn đã bị hủy' });
+        }
+        if (invoice.status === 'back') {
+            return res.status(400).json({ msg: 'Hóa đơn đã được hoàn trả' });
+        }
+        if (invoice.status === 'pending') {
+            return res.status(400).json({ msg: 'Hóa đơn chưa được thanh toán' });
+        }
+        if (invoice.status === 'paid') {
+            invoice.status = 'back';
+            invoice.note = note;
+            await invoice.save();
+            res.status(200).json({ msg: 'Hóa đơn đã được hoàn trả' });
+        }
+    } catch (err) {
+        console.error('Lỗi khi tạo hóa đơn hoàn trả:', err.message);
+        res.status(500).send('Lỗi máy chủ');
     }
 };
