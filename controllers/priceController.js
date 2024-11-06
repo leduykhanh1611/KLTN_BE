@@ -242,6 +242,16 @@ exports.getPriceByServiceAndVehicle = async (req, res) => {
 exports.updatePriceHeader = async (req, res) => {
   const { priceHeaderId } = req.params;
   const { price_list_name, start_date, end_date, is_active } = req.body;
+  if(is_active != null && price_list_name == null && start_date == null && end_date == null) {
+    let priceHeader = await PriceHeader.findById(priceHeaderId);
+    if (!priceHeader || priceHeader.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy bảng giá' });
+    }
+    priceHeader.is_active = is_active;
+    priceHeader.updated_at = Date.now();
+    await priceHeader.save();
+    return res.status(200).json({ msg: 'Bảng giá đã được cập nhật', priceHeader });
+  }
 
   try {
     let priceHeader = await PriceHeader.findById(priceHeaderId);
@@ -268,6 +278,16 @@ exports.updatePriceHeader = async (req, res) => {
 exports.updatePriceLine = async (req, res) => {
   const { priceLineId } = req.params;
   const { service_id, vehicle_type_id, price, is_active } = req.body;
+  if(is_active != null && service_id == null && vehicle_type_id == null && price == null) {
+    let priceLine = await PriceLine.findById(priceLineId);
+    if (!priceLine || priceLine.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy chi tiết giá' });
+    }
+    priceLine.is_active = is_active;
+    priceLine.updated_at = Date.now();
+    await priceLine.save();
+    return res.status(200).json({ msg: 'Chi tiết giá đã được cập nhật', priceLine });
+  }
 
   try {
     let priceLine = await PriceLine.findById(priceLineId);

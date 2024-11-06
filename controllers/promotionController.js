@@ -200,6 +200,24 @@ exports.softDeletePromotionHeader = async (req, res) => {
 exports.updatePromotionHeader = async (req, res) => {
     const { promotionHeaderId } = req.params;
     const { name, description, is_active, start_date, end_date } = req.body;
+    if(is_active != null && name == null && description == null && start_date == null && end_date == null){
+        let promotionHeader = await PromotionHeader.findById(promotionHeaderId);
+        if (!promotionHeader || promotionHeader.is_deleted) {
+            return res.status(404).json({ msg: 'Không tìm thấy chương trình khuyến mãi' });
+        }
+        promotionHeader.is_active = is_active;
+        promotionHeader.updated_at = Date.now();
+        await promotionHeader.save();
+        res.status(200).json({ msg: 'Cập nhật trạng thái khuyến mãi thành công', promotionHeader });
+    }
+    if (start_date >= end_date) {
+        return res.status(400).json({ msg: 'Ngày kết thúc phải sau ngày bắt đầu' });
+    }
+    if (end_date <= Date.now()) {
+        return res.status(400).json({ msg: 'Ngày kết thúc phải sau ngày hiện tại' });
+    }
+    
+
     let invoice = await Invoice.find({ promotion_header_id: promotionHeaderId });
     if (invoice.length > 0) {
         return res.status(400).json({ msg: 'Chương trình khuyến mãi này đang được sử dụng trong hóa đơn. Không thể cập nhật' });
@@ -231,6 +249,12 @@ exports.updatePromotionLine = async (req, res) => {
     const { promotionLineId } = req.params;
     const { discount_type, description, is_active, start_date, end_date } = req.body;
     let promotionDetail = await PromotionDetail.find({ promotion_line_id: promotionLineId });
+    if (is_active != null && discount_type == null && description == null && start_date == null && end_date == null) {
+        promotionLine.is_active = is_active;
+        promotionLine.updated_at = Date.now();
+        await promotionLine.save();
+        res.json({ msg: 'Cập nhật trạng thái khuyến mãi thành công', promotionLine });
+    }
     if (promotionDetail.length > 0) {
         return res.status(400).json({ msg: 'Dòng khuyến mãi này đang được sử dụng trong chi tiết khuyến mãi' });
     }
@@ -445,7 +469,16 @@ exports.getCustomersByPromotion = async (req, res) => {
 exports.updatePromotionDetail = async (req, res) => {
     const { promotionDetailId } = req.params;
     const { applicable_rank_id, service_id, discount_value, min_order_value, is_active  } = req.body;
-
+    if(is_active != null && applicable_rank_id == null && service_id == null && discount_value == null && min_order_value == null){
+        let promotionDetail = await PromotionDetail.findById(promotionDetailId);
+        if (!promotionDetail || promotionDetail.is_deleted) {
+            return res.status(404).json({ msg: 'Không tìm thấy chi tiết khuyến mãi' });
+        }
+        promotionDetail.is_active = is_active;
+        promotionDetail.updated_at = Date.now();
+        await promotionDetail.save();
+        res.json({ msg: 'Cập nhật trạng thái khuyến mãi thành công', promotionDetail });
+    }
     try {
         // Tìm chi tiết khuyến mãi theo ID
         let promotionDetail = await PromotionDetail.findById(promotionDetailId);
