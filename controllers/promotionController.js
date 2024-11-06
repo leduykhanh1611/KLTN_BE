@@ -552,3 +552,34 @@ exports.getAllPromotionDetails = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
+
+// Lấy tất cả line khuyến mãi với các điều kiện
+exports.getAllPromotionLines = async (req, res) => {
+    try {
+        const currentDate = new Date(); // Get the current date and time
+
+        const promotionLines = await PromotionLine.find({
+            is_deleted: false,
+            is_active: true,
+            start_date: { $lte: currentDate },
+            end_date: { $gte: currentDate }
+        })
+        .populate({
+            path: 'promotion_header_id',
+            match: {
+                is_deleted: false,
+                is_active: true,
+                start_date: { $lte: currentDate },
+                end_date: { $gte: currentDate }
+            }
+        });
+
+        // Filter out any promotion lines where the populated header doesn't match the criteria
+        const activePromotionLines = promotionLines.filter(line => line.promotion_header_id);
+
+        res.status(200).json(activePromotionLines);
+    } catch (err) {
+        console.error('Lỗi khi lấy danh sách dòng khuyến mãi:', err.message);
+        res.status(500).send('Lỗi máy chủ');
+    }
+};

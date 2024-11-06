@@ -19,7 +19,8 @@ const {
   updatePromotionDetail,
   softDeletePromotionDetail, 
   getPromotionWithDetails,
-  getAllPromotionDetails
+  getAllPromotionDetails,
+  getAllPromotionLines
 } = require('../controllers/promotionController');
 const auth = require('../middleware/auth');
 const isAdmin = require('../middleware/isAdmin');
@@ -120,4 +121,9 @@ router.get('/:promotionHeaderId/details', getPromotionWithDetails);
 // @desc    Lấy tất cả chi tiết khuyến mãi
 // @access  Private (chỉ admin)
 router.get('/line/details/:promotionLineId', [auth, isAdmin], getAllPromotionDetails);
+
+// @route   GET /api/promotions/mobile/lines
+// @desc    Lấy tất cả dòng khuyến mãi
+// @access  Private (chỉ admin)
+router.get('/mobile/getAll/lines', auth, getAllPromotionLines);
 module.exports = router;
