@@ -177,6 +177,7 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
         name: service.name,
         description: service.description,
         price: price,
+        time_required: service.time_required,
       });
     }
 
