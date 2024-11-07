@@ -532,3 +532,69 @@ exports.getAppointmentsByCustomer = async (req, res) => {
   }
 };
 
+// Lấy tất cả lịch hẹn của khách hàng
+exports.getAppointmentsByCustomerWatting = async (req, res) => {
+  const { customerId } = req.params;
+
+  try {
+    const appointments = await Appointment.find({ customer_id: customerId, is_deleted: false, status: 'waiting' })
+      .populate('vehicle_id')
+      .populate('slot_id')
+      .sort({ appointment_datetime: -1 })
+      .lean();
+
+    if (appointments.length === 0) {
+      return res.json(appointments);
+    }
+
+    // Tìm hóa đơn liên quan đến các lịch hẹn
+    const appointmentIds = appointments.map(appointment => appointment._id);
+    const invoices = await Invoice.find({ appointment_id: { $in: appointmentIds }, is_deleted: false }).lean();
+    
+    // Tạo map để ánh xạ hóa đơn với lịch hẹn
+    const invoiceMap = {};
+    invoices.forEach(invoice => {
+      invoiceMap[invoice.appointment_id.toString()] = invoice;
+    });
+
+    // Thêm thông tin hóa đơn và dịch vụ vào đối tượng lịch hẹn (nếu có)
+    const appointmentsWithInvoices = [];
+    for (let appointment of appointments) {
+      // Lấy các dịch vụ liên quan đến lịch hẹn
+      const appointmentServices = await AppointmentService.find({ appointment_id: appointment._id, is_deleted: false }).populate('price_line_id').lean();
+      
+      // Tính tổng phí và thêm thông tin dịch vụ vào đối tượng lịch hẹn
+      let totalCost = 0;
+      const services = [];
+
+      for (let appService of appointmentServices) {
+        const service = await Service.findById(appService.price_line_id.service_id).lean();
+        const price = appService.price_line_id.price;
+
+        // Cộng giá dịch vụ vào tổng phí
+        totalCost += price;
+
+        services.push({
+          _id: service._id,
+          name: service.name,
+          description: service.description,
+          price: price,
+          time_required: service.time_required,
+        });
+      }
+
+      // Thêm danh sách dịch vụ, tổng phí và thông tin hóa đơn vào đối tượng lịch hẹn
+      appointmentsWithInvoices.push({
+        ...appointment,
+        invoice: invoiceMap[appointment._id.toString()] || null, // Nếu không có hóa đơn, đặt giá trị là null
+        services: services,
+        total_cost: totalCost,
+      });
+    }
+    
+    res.json(appointmentsWithInvoices);
+  } catch (err) {
+    console.error('Lỗi khi lấy lịch hẹn của khách hàng:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
