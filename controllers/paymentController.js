@@ -96,7 +96,7 @@ exports.generateInvoice = async (req, res) => {
 
         // Tìm lịch hẹn theo ID
         const appointment = await Appointment.findById(appointmentId).populate('vehicle_id customer_id').lean();
-        if (!appointment || appointment.is_deleted || appointment.status !== 'completed') {
+        if (!appointment || appointment.is_deleted ) {
             return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn đã hoàn thành' });
         }
         const emp = await employee.findById(employeeId);
