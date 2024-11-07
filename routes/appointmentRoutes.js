@@ -11,7 +11,8 @@ const {
   updateAppointment,
   registerAppointmentWithoutSlot,
   getAllAppointmentsWithoutSlot,
-  addSlotToAppointment
+  addSlotToAppointment,
+  getAppointmentsByCustomer
 } = require('../controllers/appointmentController');
 
 const auth = require('../middleware/auth');
@@ -72,4 +73,10 @@ router.put('/:appointmentId', auth, updateAppointment);
 // @desc    Lấy thông tin lịch hẹn cùng các dịch vụ liên quan và tổng phí
 // @access  Private (phải đăng nhập)
 router.post('/slot/addSlotToAppointment/:appointmentId', auth, addSlotToAppointment);
+
+// @route   GET /api/appointments/:appointmentId
+// @desc    Lấy thông tin lịch hẹn cùng các dịch vụ liên quan và tổng phí
+// @access  Private (phải đăng nhập)
+router.get('/mobile/appointment/customer/:customerId', auth, getAppointmentsByCustomer);
+
 module.exports = router;

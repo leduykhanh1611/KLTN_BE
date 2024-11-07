@@ -492,4 +492,43 @@ exports.addSlotToAppointment = async (req, res) => {
   }
 }
 
+// Lấy tất cả lịch hẹn của khách hàng
+exports.getAppointmentsByCustomer = async (req, res) => {
+  const { customerId } = req.params;
+
+  try {
+    const appointments = await Appointment.find({ customer_id: customerId, is_deleted: false })
+      .populate('vehicle_id')
+      .populate('slot_id')
+      .sort({ appointment_datetime: -1 })
+      .lean();
+
+    if (appointments.length === 0) {
+      return res.json(appointments);
+    }
+
+    // Tìm hóa đơn liên quan đến các lịch hẹn
+    const appointmentIds = appointments.map(appointment => appointment._id);
+    const invoices = await Invoice.find({ appointment_id: { $in: appointmentIds }, is_deleted: false }).lean();
+
+    // Tạo map để ánh xạ hóa đơn với lịch hẹn
+    const invoiceMap = {};
+    invoices.forEach(invoice => {
+      invoiceMap[invoice.appointment_id.toString()] = invoice;
+    });
+
+    // Thêm thông tin hóa đơn vào đối tượng lịch hẹn (nếu có)
+    const appointmentsWithInvoices = appointments.map(appointment => {
+      return {
+        ...appointment,
+        invoice: invoiceMap[appointment._id.toString()] || null, // Nếu không có hóa đơn, đặt giá trị là null
+      };
+    });
+
+    res.json(appointmentsWithInvoices);
+  } catch (err) {
+    console.error('Lỗi khi lấy lịch hẹn của khách hàng:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};
 
