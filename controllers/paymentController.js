@@ -89,6 +89,75 @@ exports.createPaymentLink = async (req, res) => {
     }
 };
 
+// Tạo liên kết thanh toán cho khách hàng ở mobile
+exports.createPaymentLinkForMobile = async (req, res) => {
+    const { invoiceId } = req.params;
+    try {
+        // Tìm hóa đơn theo ID
+        const invoice = await Invoice.findById(invoiceId);
+        if (!invoice || invoice.is_deleted) {
+            return res.status(404).json({ msg: 'Không tìm thấy hóa đơn hợp lệ' });
+        }
+        if (invoice.status === 'paid') {
+            return res.status(400).json({ msg: 'Hóa đơn đã được thanh toán' });
+        }
+        // Lấy chi tiết hóa đơn
+        const invoiceDetails = await InvoiceDetail.find({
+            invoice_id: invoiceId,
+            is_deleted: false,
+        }).populate('service_id');
+
+        // Tạo mã đơn hàng ngẫu nhiên 6 chữ số
+        const orderCode = Math.floor(100000 + Math.random() * 900000);
+        const amount = invoice.final_amount;
+        // Tạo liên kết thanh toán bằng PayOS
+        const paymentBody = {
+            orderCode: orderCode,
+            amount: amount,
+            description: invoiceId,
+            items: invoiceDetails.map(detail => ({
+                name: detail.service_id.name,
+                quantity: detail.quantity,
+                price: detail.price,
+            })),
+            cancelUrl: 'https://auto-tech-mu.vercel.app',
+            returnUrl: 'https://auto-tech-mu.vercel.app',
+        };
+
+        const paymentLinkRes = await payOS.createPaymentLink(paymentBody);
+
+        // Lưu thông tin thanh toán vào cơ sở dữ liệu
+        const payment = new Payment({
+            invoice_id: invoice._id,
+            order_code: orderCode,
+            amount: invoice.final_amount,
+            description: invoice._id,
+            account_number: paymentLinkRes.accountNumber || '',
+            reference: paymentLinkRes.reference || '',
+            transaction_date_time: new Date().toISOString(),
+            currency: paymentLinkRes.currency || 'VND',
+            payment_link_id: paymentLinkRes.paymentLinkId || '',
+            code: paymentLinkRes.code || '',
+            desc: paymentLinkRes.desc || 'Chờ thanh toán',
+            counter_account_bank_id: paymentLinkRes.counterAccountBankId || null,
+            counter_account_bank_name: paymentLinkRes.counterAccountBankName || null,
+            counter_account_name: paymentLinkRes.counterAccountName || null,
+            counter_account_number: paymentLinkRes.counterAccountNumber || null,
+            virtual_account_name: paymentLinkRes.virtualAccountName || null,
+            virtual_account_number: paymentLinkRes.virtualAccountNumber || null,
+            payment_status: 'Chờ thanh toán',
+            is_deleted: false,
+        });
+        await payment.save();
+
+        res.status(200).json({ msg: 'Liên kết thanh toán đã được tạo thành công', paymentLink: paymentLinkRes });
+    } catch (err) {
+        console.error('Lỗi khi tạo liên kết thanh toán:', err.message);
+        res.status(500).send('Lỗi máy chủ');
+    }
+};
+
+
 // Xuất hóa đơn thanh toán cho khách hàng
 exports.generateInvoice = async (req, res) => {
     const { appointmentId, employeeId } = req.params;

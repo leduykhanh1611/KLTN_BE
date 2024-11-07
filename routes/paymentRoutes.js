@@ -3,7 +3,7 @@ const Payment = require('../models/Payment');
 const Invoice = require('../models/Invoice');
 const Cus = require('../models/Customer');
 const router = express.Router();
-const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF, getInvoice, createRefundInvoice } = require('../controllers/paymentController');
+const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF, getInvoice, createRefundInvoice, createPaymentLinkForMobile } = require('../controllers/paymentController');
 const auth = require('../middleware/auth');
 
 // @route   POST /api/payments/generate-invoice/:appointmentId
@@ -15,6 +15,12 @@ router.post('/generate-invoice/:appointmentId/employee/:employeeId', auth, gener
 // @desc    Tạo liên kết thanh toán cho hóa đơn
 // @access  Private (phải đăng nhập)
 router.post('/create-payment-link/:invoiceId', createPaymentLink);
+
+
+// @route   POST /api/payments/mobile/create-payment-link/:invoiceId
+// @desc    Tạo liên kết thanh toán cho hóa đơn
+// @access  Private (phải đăng nhập)
+router.post('/mobile/create-payment-link/:invoiceId', createPaymentLinkForMobile);
 
 // @route   POST /api/payments/webhook
 // @desc    Xử lý webhook trả về kết quả thanh toán
@@ -77,4 +83,5 @@ router.get('/invoice/:invoiceId/pdf', getInvoiceAndGeneratePDF);
 // @desc    trả hóa đơn
 // @access  Public
 router.post('/refundInvoice',auth, createRefundInvoice);
+
 module.exports = router;
