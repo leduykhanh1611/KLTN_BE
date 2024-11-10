@@ -3,7 +3,7 @@ const Payment = require('../models/Payment');
 const Invoice = require('../models/Invoice');
 const Cus = require('../models/Customer');
 const router = express.Router();
-const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF, getInvoice, createRefundInvoice, createPaymentLinkForMobile } = require('../controllers/paymentController');
+const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF, getInvoice, createRefundInvoice, createPaymentLinkForMobile, createRefundInvoiceDirectly } = require('../controllers/paymentController');
 const auth = require('../middleware/auth');
 
 // @route   POST /api/payments/generate-invoice/:appointmentId
@@ -72,25 +72,7 @@ router.post('/webhook', async (req, res) => {
 // @route   POST /api/payments/paylive/:invoiceId
 // @desc    Tạo thanh toán tiền mặt cho hóa đơn
 // @access  Private (phải đăng nhập)
-router.post('/paylive/:invoiceId',auth, async (req, res) => {
-
-    const invoice = await Invoice.findById(req.params.invoiceId);
-    if (invoice) {
-        invoice.status = 'paid';
-        await invoice.save();
-        console.log('invoice', invoice);
-
-    }
-    const user = await Cus.findById(invoice.customer_id);
-    if (user) {
-        user.total_spending += invoice.final_amount;
-        await user.save();
-        console.log('user', user);
-
-    }
-
-    res.status(200).json("Thanh toán thành công");
-});
+router.post('/paylive/:invoiceId',auth, createRefundInvoiceDirectly);
 
 // @route   GET /api/payments/invoice/:invoiceId
 // @desc    Lấy thông tin hóa đơn

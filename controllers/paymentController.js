@@ -802,3 +802,38 @@ exports.createRefundInvoice = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
+
+// tạo hóa đơn trả trực tiếp cho khach hàng
+exports.createRefundInvoiceDirectly = async (req, res) => {
+    const { invoiceId } = req.params;
+    try {
+        // Tìm hóa đơn theo ID
+        const invoice = await Invoice.findById(invoiceId);
+        if (!invoice || invoice.is_deleted) {
+            return res.status(404).json({ msg: 'Không tìm thấy hóa đơn hợp lệ' });
+        }
+        if (invoice.status === 'cancelled') {
+            return res.status(400).json({ msg: 'Hóa đơn đã bị hủy' });
+        }
+        if (invoice.status === 'back') {
+            return res.status(400).json({ msg: 'Hóa đơn đã được hoàn trả' });
+        }
+        if (invoice.status === 'pending') {
+            invoice.status = 'paid';
+            await invoice.save();
+            console.log('invoice', invoice);
+
+        }
+        const user = await Cus.findById(invoice.customer_id);
+        if (user) {
+            user.total_spending += invoice.final_amount;
+            await user.save();
+            console.log('user', user);
+        }
+        res.status(200).json({msg: "Thanh toán thành công"});
+    } catch (err) {
+        console.error('Lỗi khi thanh toán trực tiếp:', err.message);
+        res.status(500).send('Lỗi máy chủ thanh toán trực tiếp ' + err.message);
+
+    }
+}
