@@ -74,8 +74,6 @@ exports.getRevenueByTimePeriod = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
-
-
 //Thống kê Số Lịch Hẹn Theo Khoảng Thời Gian
 exports.getAppointmentsByTimePeriod = async (req, res) => {
     const { start_date, end_date } = req.query;
@@ -150,8 +148,8 @@ exports.exportStatisticsToExcel = async (req, res) => {
             appointment_datetime: { $gte: new Date(start_date), $lte: new Date(end_date) },
             is_deleted: false
         })
-        .populate('customer_id')
-        .lean();
+            .populate('customer_id')
+            .lean();
 
         if (appointments.length === 0) {
             return res.status(404).json({ msg: 'Không tìm thấy dữ liệu trong khoảng thời gian này' });
@@ -194,32 +192,24 @@ exports.exportStatisticsToExcel = async (req, res) => {
     }
 };
 
-// API xuất thống kê doanh thu theo tháng hoặc năm ra file Excel với biểu đồ và thêm các sheet thống kê khác
-exports.exportMonthlyStatisticsToExcel = async (req, res) => {
-    const { year, month } = req.query;
+
+exports.exportRevenueStatisticsToExcel = async (req, res) => {
+    const { start_date, end_date } = req.query;
     try {
-        if (!year) {
-            return res.status(400).json({ msg: 'Vui lòng cung cấp năm để thống kê doanh thu' });
+        if (!start_date || !end_date) {
+            return res.status(400).json({ msg: 'Vui lòng cung cấp khoảng thời gian để thống kê doanh thu' });
         }
 
-        // Tạo bộ lọc thời gian
-        let startDate, endDate;
-        if (month) {
-            startDate = new Date(`${year}-${month}-01`);
-            endDate = new Date(startDate);
-            endDate.setMonth(endDate.getMonth() + 1);
-        } else {
-            startDate = new Date(`${year}-01-01`);
-            endDate = new Date(`${year}-12-31`);
+        const startDate = new Date(start_date);
+        const endDate = new Date(end_date);
+
+        if (isNaN(startDate) || isNaN(endDate)) {
+            return res.status(400).json({ msg: 'Ngày không hợp lệ' });
         }
 
-        // Lấy doanh thu theo từng tháng hoặc tháng cụ thể trong năm
-        const monthlyRevenue = new Array(12).fill(0);
-        const totalAppointments = new Array(12).fill(0);
-        const completedAppointments = new Array(12).fill(0);
-        const cancelledAppointments = new Array(12).fill(0);
-        const serviceUsage = {};
-        const customerSpending = {};
+        // Format dates to dd/MM/yyyy
+        const formattedStartDate = startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const formattedEndDate = endDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
         const invoices = await Invoice.find({
             is_deleted: false,
@@ -228,122 +218,158 @@ exports.exportMonthlyStatisticsToExcel = async (req, res) => {
                 $gte: startDate,
                 $lte: endDate,
             },
-        }).populate('customer_id');
+        }).populate('customer_id employee_id');
 
-        invoices.forEach(invoice => {
-            const monthIndex = new Date(invoice.created_at).getMonth(); // Lấy tháng từ 0 - 11
-            if (!month || monthIndex === parseInt(month) - 1) {
-                monthlyRevenue[monthIndex] += invoice.final_amount;
-            }
-            // Tính tổng tiền khách hàng đã chi
-            if (invoice.customer_id) {
-                const customerName = invoice.customer_id.name;
-                if (customerSpending[customerName]) {
-                    customerSpending[customerName] += invoice.final_amount;
-                } else {
-                    customerSpending[customerName] = invoice.final_amount;
-                }
-            }
+        const invoiceData = invoices.map(invoice => {
+            return {
+                date: new Date(invoice.created_at).toLocaleDateString('vi-VN'),
+                employeeCode: String(invoice.employee_id._id || '').substring(0, 5).toUpperCase(),
+                employeeName: invoice.employee_id?.name || '',
+                discount: Math.round(invoice.discount_amount),
+                revenueBeforeDiscount: Math.round(invoice.total_amount),
+                revenueAfterDiscount: Math.round(invoice.final_amount),
+            };
         });
 
-        const appointments = await Appointment.find({
-            is_deleted: false,
-            appointment_datetime: {
-                $gte: startDate,
-                $lte: endDate,
-            },
-        });
-
-        appointments.forEach(appointment => {
-            const monthIndex = new Date(appointment.appointment_datetime).getMonth(); // Lấy tháng từ 0 - 11
-            if (!month || monthIndex === parseInt(month) - 1) {
-                totalAppointments[monthIndex]++;
-                if (appointment.status === 'completed') {
-                    completedAppointments[monthIndex]++;
-                } else if (appointment.status === 'cancelled') {
-                    cancelledAppointments[monthIndex]++;
-                }
-            }
-        });
-
-        const appointmentServices = await AppointmentService.find({
-            is_deleted: false,
-        }).populate({
-            path: 'price_line_id',
-            populate: {
-                path: 'service_id',
-                model: 'Service'
-            }
-        });
-
-        appointmentServices.forEach(appService => {
-            const serviceName = appService.price_line_id?.service_id?.name;
-            if (serviceName) {
-                if (serviceUsage[serviceName]) {
-                    serviceUsage[serviceName]++;
-                } else {
-                    serviceUsage[serviceName] = 1;
-                }
-            }
-        });
-
-        // Tạo workbook và các worksheet
+        const borderStyle = { top: { style: 'thin' }, bottom: { style: 'thin' } };
         const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Doanh Số Bán Hàng Theo Ngày');
+        worksheet.properties.tabColor = { argb: 'FF0000FF' }; // ARGB format for blue color
+        worksheet.properties.defaultRowHeight = 20; // Set default row height to 30
+        worksheet.properties.defaultColWidth = 20; // Set default column width to 20
+        // Header Information
+        worksheet.mergeCells('A1:G1');
+        worksheet.getCell('A1').value = 'Tên Cửa Hàng: L&K TECH';
+        worksheet.getCell('A1').font = { bold: true };
+        worksheet.mergeCells('A2:G2');
+        worksheet.getCell('A2').value = 'Địa chỉ cửa hàng: 319 C16 Lý Thường Kiệt, Phường 15, Quận 11, Tp.HCM';
+        worksheet.getCell('A2').font = { bold: true };
+        worksheet.mergeCells('A3:G3');
+        worksheet.getCell('A3').value = `Ngày in: ${new Date().toLocaleDateString('vi-VN')}`;
+        worksheet.getCell('A3').font = { bold: true };
 
-        // Sheet Doanh Thu
-        const revenueSheet = workbook.addWorksheet('Doanh Thu');
-        revenueSheet.columns = [
-            { header: 'Tháng', key: 'month', width: 10 },
-            { header: 'Doanh Thu (VND)', key: 'revenue', width: 20 },
-        ];
-        for (let i = 0; i < 12; i++) {
-            if (!month || i === parseInt(month) - 1) {
-                revenueSheet.addRow({ month: `Tháng ${i + 1}`, revenue: monthlyRevenue[i] });
-            }
-        }
+        // Add title and date range rows
+        worksheet.mergeCells('A4:G4');
+        worksheet.getCell('A4').value = 'DOANH SỐ BÁN HÀNG THEO NGÀY';
+        worksheet.getCell('A4').font = { bold: true , size: 16};;
+        worksheet.getCell('A4').alignment = { horizontal: 'center' };
 
-        // Sheet Lịch Hẹn
-        const appointmentSheet = workbook.addWorksheet('Lịch Hẹn');
-        appointmentSheet.columns = [
-            { header: 'Tháng', key: 'month', width: 10 },
-            { header: 'Tổng Số Lịch Hẹn', key: 'total', width: 20 },
-            { header: 'Hoàn Thành', key: 'completed', width: 15 },
-            { header: 'Hủy', key: 'cancelled', width: 15 },
-        ];
-        for (let i = 0; i < 12; i++) {
-            if (!month || i === parseInt(month) - 1) {
-                appointmentSheet.addRow({
-                    month: `Tháng ${i + 1}`,
-                    total: totalAppointments[i],
-                    completed: completedAppointments[i],
-                    cancelled: cancelledAppointments[i],
+        worksheet.mergeCells('A5:G5');
+        worksheet.getCell('A5').value = `Từ ngày: ${formattedStartDate}       Đến ngày: ${formattedEndDate}`;
+        // worksheet.getCell('A5').font = { bold: true };
+        worksheet.getCell('A5').alignment = { horizontal: 'centerContinuous' };
+
+        // Table Headers
+        worksheet.addRow([]);
+        const headerRow = worksheet.addRow(['STT', 'NVBH', 'Tên NVBH', 'Ngày', 'Chiết khấu', 'Doanh số trước CK', 'Doanh số sau CK']);
+        headerRow.eachCell((cell) => {
+            cell.border = borderStyle;
+            cell.font = { bold: true };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+        worksheet.getRow(6).font = { bold: true };
+        worksheet.getRow(6).alignment = { vertical: 'middle', horizontal: 'center' };
+        worksheet.views = [{ showGridLines: false }];
+
+        let currentDate = '';
+        let rowIndex = 7;
+        let dailyTotalDiscount = 0;
+        let dailyTotalRevenueBeforeDiscount = 0;
+        let dailyTotalRevenueAfterDiscount = 0;
+        let grandTotalDiscount = 0;
+        let grandTotalRevenueBeforeDiscount = 0;
+        let grandTotalRevenueAfterDiscount = 0;
+        let employeeCounter = 1;
+        let employeeSTT = 1;
+
+        // Loop through invoice data to process each date and employee's transactions
+        invoiceData.forEach((data, index) => {
+            if (data.date !== currentDate) {
+                // Add subtotal row for the previous date if there was a change in date
+                if (currentDate !== '') {
+                    const subtotalRow = worksheet.addRow(['', '', '', 'Tổng cộng theo ngày', dailyTotalDiscount, dailyTotalRevenueBeforeDiscount, dailyTotalRevenueAfterDiscount]);
+                    subtotalRow.font = { italic: true, bold: true }; // Italic and bold for subtotal row
+                    subtotalRow.alignment = { vertical: 'middle', horizontal: 'center' };
+                    subtotalRow.eachCell((cell) => {
+                        cell.border = borderStyle;
+                        if (cell._column._key === 'E' || cell._column._key === 'F' || cell._column._key === 'G') {
+                            cell.numFmt = '#,##0'; // Format as integer with commas
+                        }
+                    });
+                    rowIndex++;
+                    dailyTotalDiscount = 0;
+                    dailyTotalRevenueBeforeDiscount = 0;
+                    dailyTotalRevenueAfterDiscount = 0;
+                }
+
+                // Start a new date section
+                currentDate = data.date;
+                const dateRow = worksheet.addRow([`Ngày: ${currentDate}`]);
+                dateRow.font = { bold: true }; // Bold font for date row
+                dateRow.alignment = { vertical: 'middle', horizontal: 'center' };
+                dateRow.eachCell((cell) => {
+                    cell.border = borderStyle;
                 });
+                rowIndex++;
+                employeeCounter = 1;
+                employeeSTT = 1;
             }
+
+            // Add transaction row for the current employee and date
+            const transactionRow = worksheet.addRow([employeeSTT, data.employeeCode, data.employeeName, data.date, data.discount, data.revenueBeforeDiscount, data.revenueAfterDiscount]);
+            transactionRow.alignment = { vertical: 'middle', horizontal: 'center' };
+            transactionRow.eachCell((cell) => {
+                if (cell._column._key === 'E' || cell._column._key === 'F' || cell._column._key === 'G') {
+                    cell.numFmt = '#,##0';
+                }
+                cell.border = borderStyle;
+            });
+
+            // Accumulate daily and grand totals
+            dailyTotalDiscount += data.discount;
+            dailyTotalRevenueBeforeDiscount += data.revenueBeforeDiscount;
+            dailyTotalRevenueAfterDiscount += data.revenueAfterDiscount;
+            grandTotalDiscount += data.discount;
+            grandTotalRevenueBeforeDiscount += data.revenueBeforeDiscount;
+            grandTotalRevenueAfterDiscount += data.revenueAfterDiscount;
+
+            rowIndex++;
+            employeeSTT++;
+        });
+
+        // Add the final subtotal row for the last date after looping
+        if (currentDate !== '') {
+            const finalSubtotalRow = worksheet.addRow(['', '', '', 'Tổng cộng theo ngày', dailyTotalDiscount, dailyTotalRevenueBeforeDiscount, dailyTotalRevenueAfterDiscount]);
+            finalSubtotalRow.font = { italic: true, bold: true }; // Italic and bold for final subtotal row
+            finalSubtotalRow.alignment = { vertical: 'middle', horizontal: 'center' };
+            finalSubtotalRow.eachCell((cell) => {
+                cell.border = borderStyle;
+                if (cell._column._key === 'E' || cell._column._key === 'F' || cell._column._key === 'G') {
+                    cell.numFmt = '#,##0';
+                }
+            });
+            rowIndex++;
         }
 
-        // Sheet Sử Dụng Dịch Vụ
-        const serviceSheet = workbook.addWorksheet('Sử Dụng Dịch Vụ');
-        serviceSheet.columns = [
-            { header: 'Dịch Vụ', key: 'service', width: 30 },
-            { header: 'Số Lần Sử Dụng', key: 'usage', width: 20 },
-        ];
-        for (let [serviceName, usage] of Object.entries(serviceUsage)) {
-            serviceSheet.addRow({ service: serviceName, usage });
-        }
 
-        // Sheet Tổng Chi Tiêu Khách Hàng
-        const customerSheet = workbook.addWorksheet('Chi Tiêu Khách Hàng');
-        customerSheet.columns = [
-            { header: 'Khách Hàng', key: 'customer', width: 30 },
-            { header: 'Tổng Chi Tiêu (VND)', key: 'spending', width: 20 },
-        ];
-        for (let [customerName, spending] of Object.entries(customerSpending)) {
-            customerSheet.addRow({ customer: customerName, spending });
-        }
+        // Add final grand total row with a border, center alignment, and bold font
+        const grandTotalRowData = ['Tổng cộng', '', '', '', grandTotalDiscount, grandTotalRevenueBeforeDiscount, grandTotalRevenueAfterDiscount];
+        const grandTotalRow = worksheet.addRow(grandTotalRowData);
 
-        // Ghi workbook vào một buffer và gửi file về
+        // Apply formatting to each cell in the grand total row
+        grandTotalRow.eachCell((cell, colNumber) => {
+            cell.font = { bold: true }; // Set font to bold
+            cell.alignment = { vertical: 'middle', horizontal: 'center' }; // Center alignment
+            cell.border = borderStyle; // Apply border style
+
+            // Apply number format only to specific columns
+            if (colNumber >= 5 && colNumber <= 7) { // Columns E, F, G for discount and revenue
+                cell.numFmt = '#,##0'; // Format as integer with commas
+            }
+        });
+
         const buffer = await workbook.xlsx.writeBuffer();
-        const name = `statistics_${year}${month ? `_${month}` : ''}.xlsx`;
+        const name = `Thong_Ke_Tu_${start_date}_Den_${end_date}.xlsx`;
         res.setHeader('Content-Disposition', 'attachment; filename=' + name);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.status(200).send(buffer);

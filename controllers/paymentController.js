@@ -325,9 +325,6 @@ exports.generateInvoice = async (req, res) => {
                 }
             }
         }
-
-
-
         // Tính tổng số tiền giảm giá
         discountAmount = fixedDiscount + percentageDiscount;
 
