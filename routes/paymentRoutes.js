@@ -69,6 +69,29 @@ router.post('/webhook', async (req, res) => {
     res.json();
 });
 
+// @route   POST /api/payments/paylive/:invoiceId
+// @desc    Tạo thanh toán tiền mặt cho hóa đơn
+// @access  Private (phải đăng nhập)
+router.post('/paylive/:invoiceId',auth, async (req, res) => {
+
+    const invoice = await Invoice.findById(req.params.invoiceId);
+    if (invoice) {
+        invoice.status = 'paid';
+        await invoice.save();
+        console.log('invoice', invoice);
+
+    }
+    const user = await Cus.findById(invoice.customer_id);
+    if (user) {
+        user.total_spending += invoice.final_amount;
+        await user.save();
+        console.log('user', user);
+
+    }
+
+    res.status(200).json("Thanh toán thành công");
+});
+
 // @route   GET /api/payments/invoice/:invoiceId
 // @desc    Lấy thông tin hóa đơn
 // @access  Private (phải đăng nhập)
@@ -82,6 +105,6 @@ router.get('/invoice/:invoiceId/pdf', getInvoiceAndGeneratePDF);
 // @route   POST /api/payments/refundInvoice
 // @desc    trả hóa đơn
 // @access  Public
-router.post('/refundInvoice',auth, createRefundInvoice);
+router.post('/refundInvoice', auth, createRefundInvoice);
 
 module.exports = router;

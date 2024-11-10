@@ -165,7 +165,7 @@ exports.generateInvoice = async (req, res) => {
 
         // Tìm lịch hẹn theo ID
         const appointment = await Appointment.findById(appointmentId).populate('vehicle_id customer_id').lean();
-        if (!appointment || appointment.is_deleted ) {
+        if (!appointment || appointment.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn đã hoàn thành' });
         }
         const emp = await employee.findById(employeeId);
@@ -547,24 +547,24 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
         }
         doc.moveDown();
         const customer = savedInvoice.customer_id;
-        if(savedInvoice.status === 'back'){
+        if (savedInvoice.status === 'back') {
             doc.fontSize(12)
-            .text(`Tên khách hàng: ${customer.name}`)
-            .text(`Email: ${customer.email}`)
-            .text(`Địa chỉ: ${customer.address}`)
-            .text(`Số điện thoại: ${customer.phone_number}`)
-            .text('Lý do hoàn trả: ' + savedInvoice.note)
-            .moveDown();
+                .text(`Tên khách hàng: ${customer.name}`)
+                .text(`Email: ${customer.email}`)
+                .text(`Địa chỉ: ${customer.address}`)
+                .text(`Số điện thoại: ${customer.phone_number}`)
+                .text('Lý do hoàn trả: ' + savedInvoice.note)
+                .moveDown();
         } else {
             doc.fontSize(12)
-            .text(`Tên khách hàng: ${customer.name}`)
-            .text(`Email: ${customer.email}`)
-            .text(`Địa chỉ: ${customer.address}`)
-            .text(`Số điện thoại: ${customer.phone_number}`)
-            .moveDown();
+                .text(`Tên khách hàng: ${customer.name}`)
+                .text(`Email: ${customer.email}`)
+                .text(`Địa chỉ: ${customer.address}`)
+                .text(`Số điện thoại: ${customer.phone_number}`)
+                .moveDown();
         }
 
-        
+
 
         if (savedInvoice.employee_id) {
             doc.text(`Nhân viên xử lý: ${savedInvoice.employee_id.name}`);
@@ -789,6 +789,12 @@ exports.createRefundInvoice = async (req, res) => {
             invoice.status = 'back';
             invoice.note = note;
             await invoice.save();
+            const user = await Cus.findById(invoice.customer_id);
+            if (user) {
+                user.total_spending -= invoice.final_amount;
+                await user.save();
+                console.log('user', user);
+            }
             res.status(200).json({ msg: 'Hóa đơn đã được hoàn trả' });
         }
     } catch (err) {
