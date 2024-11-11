@@ -334,10 +334,10 @@ exports.filterAppointmentsByDate = async (req, res) => {
       .lean();
 
     if (appointments.length === 0) {
-      return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn nào trong ngày này' });
+      return res.status(200).json([]);
     }
 
-    res.json(appointments);
+    res.status(200).json(appointments);
   } catch (err) {
     console.error('Lỗi khi lọc lịch hẹn theo ngày:', err.message);
     res.status(500).send('Lỗi máy chủ');
