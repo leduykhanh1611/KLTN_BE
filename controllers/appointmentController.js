@@ -197,7 +197,7 @@ exports.cancelAppointment = async (req, res) => {
   try {
     const appointment = await Appointment.findById(appointmentId);
     const inVoice = await Invoice.findOne({ appointment_id: appointmentId, is_deleted: false }).lean();
-    if (inVoice != null && inVoice.status == 'paid') {
+    if (inVoice != null &&  inVoice.status == 'paid') {
       return res.status(404).json({ msg: 'Lịch hẹn đã thanh toán, không thể xóa' });
     }
     if (!appointment || appointment.is_deleted) {
@@ -334,10 +334,10 @@ exports.filterAppointmentsByDate = async (req, res) => {
       .lean();
 
     if (appointments.length === 0) {
-      return res.status(200).json([]);
+      return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn nào trong ngày này' });
     }
 
-    res.status(200).json(appointments);
+    res.json(appointments);
   } catch (err) {
     console.error('Lỗi khi lọc lịch hẹn theo ngày:', err.message);
     res.status(500).send('Lỗi máy chủ');
