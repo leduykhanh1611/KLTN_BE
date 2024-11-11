@@ -149,7 +149,6 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
       .populate('vehicle_id customer_id')
       .populate('slot_id')
       .lean();
-
     if (!appointment) {
       return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn' });
     }
@@ -197,11 +196,15 @@ exports.cancelAppointment = async (req, res) => {
 
   try {
     const appointment = await Appointment.findById(appointmentId);
+    const inVoice = await Invoice.findOne({ appointment_id: appointmentId, is_deleted: false }).lean();
+    if (inVoice.status == 'paid') {
+      return res.status(404).json({ msg: 'Lịch hẹn đã thanh toán, không thể xóa' });
+    }
     if (!appointment || appointment.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn' });
     }
-
-    if (appointment.status !== 'completed' && appointment.status !== 'cancelled') {
+    
+    if (appointment.status == 'completed' && appointment.status == 'cancelled') {
       return res.status(400).json({ msg: 'Không thể hủy lịch hẹn này' });
     }
 
