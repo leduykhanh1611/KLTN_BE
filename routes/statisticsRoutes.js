@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getRevenueByTimePeriod, getAppointmentsByTimePeriod, getMonthlyStatistics, exportStatisticsToExcel, exportRevenueStatisticsToExcel } = require('../controllers/statisticsController');
+const { getRevenueByTimePeriod, getAppointmentsByTimePeriod, getMonthlyStatistics, exportStatisticsToExcel, exportRevenueStatisticsToExcel, getRevenueStatistics } = require('../controllers/statisticsController');
 
 // @route   GET /api/statistics/revenue
 // @desc    Lấy doanh thu theo khoảng thời gian
@@ -26,4 +26,10 @@ router.get('/export', exportStatisticsToExcel);
 // @desc    Xuất thống kê ra file Excel
 // @access  Private (Chỉ admin hoặc nhân viên)
 router.get('/export2', exportRevenueStatisticsToExcel);
+
+
+// @route   GET /api/statistics/revenue
+// @desc    Lấy doanh thu theo khoảng thời gian
+// @access  Private (Chỉ admin hoặc nhân viên)
+router.get('/getAll/revenue', getRevenueStatistics);
 module.exports = router;

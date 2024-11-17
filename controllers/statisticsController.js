@@ -379,3 +379,117 @@ exports.exportRevenueStatisticsToExcel = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
+
+exports.getRevenueStatistics = async (req, res) => {
+    const { start_date, end_date } = req.query;
+    try {
+        if (!start_date || !end_date) {
+            return res.status(400).json({ msg: 'Vui lòng cung cấp khoảng thời gian để thống kê doanh thu' });
+        }
+
+        const startDate = new Date(start_date);
+        const endDate = new Date(end_date);
+
+        if (isNaN(startDate) || isNaN(endDate)) {
+            return res.status(400).json({ msg: 'Ngày không hợp lệ' });
+        }
+
+        // Format dates to dd/MM/yyyy
+        const formattedStartDate = startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const formattedEndDate = endDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        const invoices = await Invoice.find({
+            is_deleted: false,
+            status: 'paid',
+            created_at: {
+                $gte: startDate,
+                $lte: endDate,
+            },
+        }).populate('customer_id employee_id');
+
+        const invoiceData = invoices.map(invoice => ({
+            date: new Date(invoice.created_at).toLocaleDateString('vi-VN'),
+            employeeCode: String(invoice.employee_id._id || '').substring(0, 5).toUpperCase(),
+            employeeName: invoice.employee_id?.name || '',
+            discount: Math.round(invoice.discount_amount),
+            revenueBeforeDiscount: Math.round(invoice.total_amount),
+            revenueAfterDiscount: Math.round(invoice.final_amount),
+        }));
+
+        let currentDate = '';
+        let dailyTotalDiscount = 0;
+        let dailyTotalRevenueBeforeDiscount = 0;
+        let dailyTotalRevenueAfterDiscount = 0;
+        let grandTotalDiscount = 0;
+        let grandTotalRevenueBeforeDiscount = 0;
+        let grandTotalRevenueAfterDiscount = 0;
+
+        const result = [];
+        let currentDailyData = null;
+
+        // Loop through invoice data to process each date and employee's transactions
+        invoiceData.forEach((data) => {
+            if (data.date !== currentDate) {
+                // Push daily data to the result if it's not the first date
+                if (currentDailyData) {
+                    currentDailyData.dailyTotal = {
+                        discount: dailyTotalDiscount,
+                        revenueBeforeDiscount: dailyTotalRevenueBeforeDiscount,
+                        revenueAfterDiscount: dailyTotalRevenueAfterDiscount,
+                    };
+                    result.push(currentDailyData);
+                }
+
+                // Start a new date section
+                currentDate = data.date;
+                currentDailyData = {
+                    date: currentDate,
+                    transactions: [],
+                };
+
+                dailyTotalDiscount = 0;
+                dailyTotalRevenueBeforeDiscount = 0;
+                dailyTotalRevenueAfterDiscount = 0;
+            }
+
+            // Add transaction data to the current date
+            currentDailyData.transactions.push({
+                employeeCode: data.employeeCode,
+                employeeName: data.employeeName,
+                discount: data.discount,
+                revenueBeforeDiscount: data.revenueBeforeDiscount,
+                revenueAfterDiscount: data.revenueAfterDiscount,
+            });
+
+            // Accumulate daily and grand totals
+            dailyTotalDiscount += data.discount;
+            dailyTotalRevenueBeforeDiscount += data.revenueBeforeDiscount;
+            dailyTotalRevenueAfterDiscount += data.revenueAfterDiscount;
+            grandTotalDiscount += data.discount;
+            grandTotalRevenueBeforeDiscount += data.revenueBeforeDiscount;
+            grandTotalRevenueAfterDiscount += data.revenueAfterDiscount;
+        });
+
+        // Push the final daily data to the result
+        if (currentDailyData) {
+            currentDailyData.dailyTotal = {
+                discount: dailyTotalDiscount,
+                revenueBeforeDiscount: dailyTotalRevenueBeforeDiscount,
+                revenueAfterDiscount: dailyTotalRevenueAfterDiscount,
+            };
+            result.push(currentDailyData);
+        }
+
+        // Add grand total to the response
+        const grandTotal = {
+            discount: grandTotalDiscount,
+            revenueBeforeDiscount: grandTotalRevenueBeforeDiscount,
+            revenueAfterDiscount: grandTotalRevenueAfterDiscount,
+        };
+
+        res.status(200).json({ dateRange: { start: formattedStartDate, end: formattedEndDate }, data: result, grandTotal });
+    } catch (err) {
+        console.error('Lỗi khi lấy dữ liệu:', err.message);
+        res.status(500).send('Lỗi máy chủ');
+    }
+};
