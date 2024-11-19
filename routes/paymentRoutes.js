@@ -2,6 +2,7 @@ const express = require('express');
 const Payment = require('../models/Payment');
 const Invoice = require('../models/Invoice');
 const Cus = require('../models/Customer');
+const Promotion = require('../models/Promotion');
 const router = express.Router();
 const { generateInvoice, createPaymentLink, handlePaymentWebhook, getInvoiceAndGeneratePDF, getInvoice, createRefundInvoice, createPaymentLinkForMobile, createRefundInvoiceDirectly } = require('../controllers/paymentController');
 const auth = require('../middleware/auth');
@@ -57,6 +58,17 @@ router.post('/webhook', async (req, res) => {
             console.log('user', user);
 
         }
+        const promotions = await Promotion.find({ invoice_id: payment.invoice_id });
+
+        if (promotions && promotions.length > 0) {
+            for (const promotion of promotions) {
+                promotion.is_pay = true;
+                await promotion.save();
+            }
+            console.log('Updated promotions:', promotions);
+        } else {
+            console.log('No promotions found for invoice_id:', payment.invoice_id);
+        }
     } else {
         const invoice = await Invoice.findById(payment.invoice_id);
         if (invoice) {
@@ -72,7 +84,7 @@ router.post('/webhook', async (req, res) => {
 // @route   POST /api/payments/paylive/:invoiceId
 // @desc    Tạo thanh toán tiền mặt cho hóa đơn
 // @access  Private (phải đăng nhập)
-router.post('/paylive/:invoiceId',auth, createRefundInvoiceDirectly);
+router.post('/paylive/:invoiceId', auth, createRefundInvoiceDirectly);
 
 // @route   GET /api/payments/invoice/:invoiceId
 // @desc    Lấy thông tin hóa đơn

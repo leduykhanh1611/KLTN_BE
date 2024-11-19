@@ -14,6 +14,7 @@ const Cus = require('../models/Customer');
 const employee = require('../models/Employee');
 const PromotionLine = require('../models/PromotionLine');
 const PromotionDetail = require('../models/PromotionDetail');
+const Promotion = require('../models/Promotion');
 const { console } = require('inspector');
 const payOS = new PayOS(
     process.env.PAYOS_CLIENT_ID,
@@ -345,7 +346,29 @@ exports.generateInvoice = async (req, res) => {
         });
 
         await invoice.save();
-
+        if (promotionHeader.length !== 0) {
+            // Lưu thông tin các chương trình khuyến mãi đã áp dụng
+            const promotionsToSave = [];
+        
+            // Lặp qua addedPromotionLines, chứa thông tin chi tiết về khuyến mãi
+            for (const [lineId, promotion] of addedPromotionHeaders.entries()) {
+                const promotionValue =
+                    promotion.discount_type === 2
+                        ? promotion.discount_value // Giá trị giảm giá cố định
+                        : totalAmount * (promotion.discount_value / 100); // Giá trị giảm giá theo phần trăm
+        
+                promotionsToSave.push(new Promotion({
+                    promotion_header_id: promotion.promotion_line_id, // ID của PromotionLine
+                    value: promotionValue,
+                    invoice_id: invoice._id,
+                    is_pay: false,
+                    is_deleted: false,
+                }));
+            }
+        
+            // Lưu tất cả chương trình khuyến mãi vào cơ sở dữ liệu
+            await Promotion.insertMany(promotionsToSave);
+        }
         // Lưu chi tiết hóa đơn vào database
         for (let detail of invoiceDetails) {
             const invoiceDetail = new InvoiceDetail({
@@ -818,16 +841,24 @@ exports.createRefundInvoiceDirectly = async (req, res) => {
         if (invoice.status === 'pending') {
             invoice.status = 'paid';
             await invoice.save();
-            console.log('invoice', invoice);
 
+            const promotions = await Promotion.find({ invoice_id: invoiceId });
+
+            if (promotions) {
+                for (const promotion of promotions) {
+                    promotion.is_pay = !promotion.is_pay;
+                    await promotion.save();
+                }
+            }else{
+                res.status(400).json({ msg: "Thanh toán thành công" });
+            }
+            const user = await Cus.findById(invoice.customer_id);
+            if (user) {
+                user.total_spending += invoice.final_amount;
+                await user.save();
+            }
         }
-        const user = await Cus.findById(invoice.customer_id);
-        if (user) {
-            user.total_spending += invoice.final_amount;
-            await user.save();
-            console.log('user', user);
-        }
-        res.status(200).json({msg: "Thanh toán thành công"});
+        res.status(200).json({ msg: "Thanh toán thành công" });
     } catch (err) {
         console.error('Lỗi khi thanh toán trực tiếp:', err.message);
         res.status(500).send('Lỗi máy chủ thanh toán trực tiếp ' + err.message);
