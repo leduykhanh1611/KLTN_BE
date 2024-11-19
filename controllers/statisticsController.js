@@ -4,6 +4,8 @@ const Promotion = require('../models/Promotion');
 const PromotionHeader = require('../models/PromotionHeader');
 const PromotionLine = require('../models/PromotionLine');
 const XLSX = require('xlsx');
+const StyledXLSX = require('xlsx-style');
+const XLSXStyle = require('xlsx-js-style');
 const fs = require('fs');
 const path = require('path');
 const ExcelJS = require('exceljs');
@@ -195,7 +197,7 @@ exports.exportStatisticsToExcel = async (req, res) => {
     }
 };
 
-
+// Xuất thống kê doanh thu ra file Excel
 exports.exportRevenueStatisticsToExcel = async (req, res) => {
     const { start_date, end_date } = req.query;
     try {
@@ -382,7 +384,7 @@ exports.exportRevenueStatisticsToExcel = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
-
+// Lấy thống kê doanh thu
 exports.getRevenueStatistics = async (req, res) => {
     const { start_date, end_date } = req.query;
     try {
@@ -496,7 +498,7 @@ exports.getRevenueStatistics = async (req, res) => {
         res.status(500).send('Lỗi máy chủ');
     }
 };
-
+// Thống kê khuyến mãi
 exports.getPromotionStatistics = async (req, res) => {
     try {
         const startDate = new Date(req.query.start_date);
@@ -554,7 +556,7 @@ exports.getPromotionStatistics = async (req, res) => {
             const totalValue = promotionsForLine.reduce((sum, promo) => sum + promo.value, 0);
 
             // Lấy thông tin PromotionHeader từ Map
-            const promotionHeaderInfo = promotionHeaderMap.get(promotionLine.promotion_header_id.toString()) || { name: 'Unknown', promotion_code: 'Unknown' } ;
+            const promotionHeaderInfo = promotionHeaderMap.get(promotionLine.promotion_header_id.toString()) || { name: 'Unknown', promotion_code: 'Unknown' };
 
             // Tạo đối tượng kết quả
             const promotionStatistic = {
@@ -577,3 +579,202 @@ exports.getPromotionStatistics = async (req, res) => {
         res.status(500).json({ message: 'Lỗi khi thống kê khuyến mãi', error });
     }
 };
+
+
+// Xuất thống kê khuyến mãi ra file Excel
+exports.exportPromotionStatisticsToExcel = async (req, res) => {
+    try {
+        const startDate = new Date(req.query.start_date);
+        const endDate = new Date(req.query.end_date);
+
+        // Fetch promotion statistics (replace with your actual data fetching logic)
+        const promotionStatistics = await getPromotionStatistics(startDate, endDate);
+
+        if (!promotionStatistics || promotionStatistics.length === 0) {
+            return res.status(200).json({ message: 'Không có dữ liệu để xuất báo cáo.' });
+        }
+
+        // Calculate total promotion value
+        const totalValue = promotionStatistics.reduce((sum, promo) => sum + promo.total_value, 0);
+
+        // Create a new workbook and add a worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Báo cáo CTKM');
+
+        // Hide gridlines
+        worksheet.properties.defaultGridlines = false;
+        worksheet.properties.tabColor = { argb: 'FF0000FF' }; // ARGB format for blue color
+        // Add metadata
+        worksheet.mergeCells('A1:E1');
+        const titleCell = worksheet.getCell('A1');
+        titleCell.value = 'BÁO CÁO TỔNG KẾT CTKM';
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        titleCell.font = { bold: true, size: 16 };
+
+        worksheet.addRow([]);
+        worksheet.addRow(['Thời gian xuất báo cáo:', new Date().toLocaleString('vi-VN')]);
+        worksheet.addRow(['User xuất báo cáo:', 'Admin']);
+        worksheet.addRow([]);
+
+        // Add header
+        const headerRow = worksheet.addRow(['Mã CTKM', 'Tên CTKM', 'Ngày bắt đầu', 'Ngày kết thúc', 'Số tiền chiết khấu']);
+
+        // Apply styles to each cell in the header row
+        headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF538DD5' },
+            };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' },
+            };
+        });
+
+        // Add promotion data
+        promotionStatistics.forEach((promo) => {
+            const row = worksheet.addRow([
+                promo.promotion_code,
+                promo.promotion_header_name,
+                new Date(promo.start_date).toLocaleDateString('vi-VN'),
+                new Date(promo.end_date).toLocaleDateString('vi-VN'),
+                promo.total_value,
+            ]);
+
+            // Format the 'Số tiền chiết khấu' column as currency
+            row.getCell(5).numFmt = '#,##0';
+            row.alignment = { vertical: 'middle' };
+
+            // Apply border to data cells
+            row.eachCell((cell) => {
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' },
+                };
+            });
+        });
+
+        // Add total row
+        const totalRow = worksheet.addRow(['Tổng CTKM', '', '', '', totalValue]);
+        totalRow.alignment = { horizontal: 'center', vertical: 'middle' };
+        totalRow.getCell(5).numFmt = '#,##0';
+
+        // Apply border to total row
+        totalRow.eachCell((cell) => {
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' },
+            };
+            cell.font = { bold: true, color: { argb: 'FFFF0000' } };
+        });
+
+        // Adjust column widths
+        worksheet.getColumn(1).width = 20; // Mã CTKM
+        worksheet.getColumn(2).width = 40; // Tên CTKM
+        worksheet.getColumn(3).width = 15; // Ngày bắt đầu
+        worksheet.getColumn(4).width = 15; // Ngày kết thúc
+        worksheet.getColumn(5).width = 20; // Số tiền chiết khấu
+
+        worksheet.views = [{ showGridLines: false }];
+        // Generate buffer
+        const buffer = await workbook.xlsx.writeBuffer();
+
+        // Format file name
+        const fileName = `Thong_Ke_Tu_${startDate.toISOString().split('T')[0]}_Den_${endDate.toISOString().split('T')[0]}.xlsx`;
+
+        // Send file to client
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.status(200).send(buffer);
+    } catch (error) {
+        console.error('Lỗi khi xuất báo cáo:', error);
+        res.status(500).json({ message: 'Lỗi khi xuất báo cáo', error });
+    }
+};
+
+// function for getPromotionStatistics
+async function getPromotionStatistics(startDate, endDate) {
+    try {
+        // Bước 1: Tìm các PromotionLine trong khoảng thời gian
+        const promotionLines = await PromotionLine.find({
+            is_deleted: false,
+            start_date: { $gte: startDate, $lte: endDate },
+        }).select('_id promotion_header_id start_date end_date');
+
+        if (promotionLines.length === 0) {
+            return res.status(200).json({ message: 'Không có chương trình khuyến mãi nào trong khoảng thời gian này.' });
+        }
+
+        // Bước 2: Lấy tất cả các Promotion liên quan
+        const promotionLineIds = promotionLines.map(line => line._id);
+        const promotions = await Promotion.find({
+            promotion_header_id: { $in: promotionLineIds },
+            is_deleted: false,
+            is_pay: true,
+        });
+
+        // Bước 3: Nhóm Promotion theo promotion_line_id
+        const promotionMap = new Map();
+        promotions.forEach(promotion => {
+            const lineId = promotion.promotion_header_id.toString();
+            if (!promotionMap.has(lineId)) {
+                promotionMap.set(lineId, []);
+            }
+            promotionMap.get(lineId).push(promotion);
+        });
+
+        // Tạo Map cho PromotionHeader để tối ưu truy vấn
+        const promotionHeaderIds = promotionLines.map(line => line.promotion_header_id);
+        const promotionHeaders = await PromotionHeader.find({ _id: { $in: promotionHeaderIds } }).select('_id name promotion_code start_date end_date');
+        const promotionHeaderMap = new Map();
+        promotionHeaders.forEach(header => {
+            promotionHeaderMap.set(header._id.toString(), {
+                name: header.name,
+                promotion_code: header.promotion_code,
+                start_date: header.start_date,
+                end_date: header.end_date,
+            });
+        });
+
+        // Bước 4: Sử dụng vòng lặp để tính toán và tạo kết quả
+        const result = [];
+
+        for (const promotionLine of promotionLines) {
+            const lineId = promotionLine._id.toString();
+            const promotionsForLine = promotionMap.get(lineId) || [];
+
+            // Tính tổng giá trị khuyến mãi
+            const totalValue = promotionsForLine.reduce((sum, promo) => sum + promo.value, 0);
+
+            // Lấy thông tin PromotionHeader từ Map
+            const promotionHeaderInfo = promotionHeaderMap.get(promotionLine.promotion_header_id.toString()) || { name: 'Unknown', promotion_code: 'Unknown' };
+
+            // Tạo đối tượng kết quả
+            const promotionStatistic = {
+                promotion_header_id: promotionLine.promotion_header_id,
+                promotion_header_name: promotionHeaderInfo.name,
+                promotion_code: promotionHeaderInfo.promotion_code,
+                promotion_line_id: promotionLine._id,
+                total_value: totalValue,
+                start_date: promotionHeaderInfo.start_date,
+                end_date: promotionHeaderInfo.end_date,
+            };
+
+            result.push(promotionStatistic);
+        }
+
+        return result;
+    } catch (error) {
+        console.error('Lỗi khi thống kê khuyến mãi:', error);
+        
+    }
+}
