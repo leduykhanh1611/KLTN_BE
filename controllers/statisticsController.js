@@ -532,12 +532,14 @@ exports.getPromotionStatistics = async (req, res) => {
 
         // Tạo Map cho PromotionHeader để tối ưu truy vấn
         const promotionHeaderIds = promotionLines.map(line => line.promotion_header_id);
-        const promotionHeaders = await PromotionHeader.find({ _id: { $in: promotionHeaderIds } }).select('_id name promotion_code');
+        const promotionHeaders = await PromotionHeader.find({ _id: { $in: promotionHeaderIds } }).select('_id name promotion_code start_date end_date');
         const promotionHeaderMap = new Map();
         promotionHeaders.forEach(header => {
             promotionHeaderMap.set(header._id.toString(), {
                 name: header.name,
                 promotion_code: header.promotion_code,
+                start_date: header.start_date,
+                end_date: header.end_date,
             });
         });
 
@@ -552,7 +554,7 @@ exports.getPromotionStatistics = async (req, res) => {
             const totalValue = promotionsForLine.reduce((sum, promo) => sum + promo.value, 0);
 
             // Lấy thông tin PromotionHeader từ Map
-            const promotionHeaderInfo = promotionHeaderMap.get(promotionLine.promotion_header_id.toString()) || { name: 'Unknown', promotion_code: 'Unknown' };
+            const promotionHeaderInfo = promotionHeaderMap.get(promotionLine.promotion_header_id.toString()) || { name: 'Unknown', promotion_code: 'Unknown' } ;
 
             // Tạo đối tượng kết quả
             const promotionStatistic = {
@@ -561,8 +563,8 @@ exports.getPromotionStatistics = async (req, res) => {
                 promotion_code: promotionHeaderInfo.promotion_code,
                 promotion_line_id: promotionLine._id,
                 total_value: totalValue,
-                start_date: promotionLine.start_date,
-                end_date: promotionLine.end_date,
+                start_date: promotionHeaderInfo.start_date,
+                end_date: promotionHeaderInfo.end_date,
             };
 
             result.push(promotionStatistic);
