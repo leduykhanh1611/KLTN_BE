@@ -4,7 +4,7 @@ const PromotionLineSchema = new mongoose.Schema(
   {
     promotion_header_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'PromotionHeader',
+      ref: 'PromotionLine',
       required: true,
     },
     discount_type: {

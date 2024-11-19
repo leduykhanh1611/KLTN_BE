@@ -1,5 +1,8 @@
 const Invoice = require('../models/Invoice');
 const Appointment = require('../models/Appointment');
+const Promotion = require('../models/Promotion');
+const PromotionHeader = require('../models/PromotionHeader');
+const PromotionLine = require('../models/PromotionLine');
 const XLSX = require('xlsx');
 const fs = require('fs');
 const path = require('path');
@@ -251,7 +254,7 @@ exports.exportRevenueStatisticsToExcel = async (req, res) => {
         // Add title and date range rows
         worksheet.mergeCells('A4:G4');
         worksheet.getCell('A4').value = 'DOANH SỐ BÁN HÀNG THEO NGÀY';
-        worksheet.getCell('A4').font = { bold: true , size: 16};;
+        worksheet.getCell('A4').font = { bold: true, size: 16 };;
         worksheet.getCell('A4').alignment = { horizontal: 'center' };
 
         worksheet.mergeCells('A5:G5');
@@ -491,5 +494,84 @@ exports.getRevenueStatistics = async (req, res) => {
     } catch (err) {
         console.error('Lỗi khi lấy dữ liệu:', err.message);
         res.status(500).send('Lỗi máy chủ');
+    }
+};
+
+exports.getPromotionStatistics = async (req, res) => {
+    try {
+        const startDate = new Date(req.query.start_date);
+        const endDate = new Date(req.query.end_date);
+
+        // Bước 1: Tìm các PromotionLine trong khoảng thời gian
+        const promotionLines = await PromotionLine.find({
+            is_deleted: false,
+            start_date: { $gte: startDate, $lte: endDate },
+        }).select('_id promotion_header_id start_date end_date');
+
+        if (promotionLines.length === 0) {
+            return res.status(200).json({ message: 'Không có chương trình khuyến mãi nào trong khoảng thời gian này.' });
+        }
+
+        // Bước 2: Lấy tất cả các Promotion liên quan
+        const promotionLineIds = promotionLines.map(line => line._id);
+        const promotions = await Promotion.find({
+            promotion_header_id: { $in: promotionLineIds },
+            is_deleted: false,
+            is_pay: true,
+        });
+
+        // Bước 3: Nhóm Promotion theo promotion_line_id
+        const promotionMap = new Map();
+        promotions.forEach(promotion => {
+            const lineId = promotion.promotion_header_id.toString();
+            if (!promotionMap.has(lineId)) {
+                promotionMap.set(lineId, []);
+            }
+            promotionMap.get(lineId).push(promotion);
+        });
+
+        // Tạo Map cho PromotionHeader để tối ưu truy vấn
+        const promotionHeaderIds = promotionLines.map(line => line.promotion_header_id);
+        const promotionHeaders = await PromotionHeader.find({ _id: { $in: promotionHeaderIds } }).select('_id name promotion_code');
+        const promotionHeaderMap = new Map();
+        promotionHeaders.forEach(header => {
+            promotionHeaderMap.set(header._id.toString(), {
+                name: header.name,
+                promotion_code: header.promotion_code,
+            });
+        });
+
+        // Bước 4: Sử dụng vòng lặp để tính toán và tạo kết quả
+        const result = [];
+
+        for (const promotionLine of promotionLines) {
+            const lineId = promotionLine._id.toString();
+            const promotionsForLine = promotionMap.get(lineId) || [];
+
+            // Tính tổng giá trị khuyến mãi
+            const totalValue = promotionsForLine.reduce((sum, promo) => sum + promo.value, 0);
+
+            // Lấy thông tin PromotionHeader từ Map
+            const promotionHeaderInfo = promotionHeaderMap.get(promotionLine.promotion_header_id.toString()) || { name: 'Unknown', promotion_code: 'Unknown' };
+
+            // Tạo đối tượng kết quả
+            const promotionStatistic = {
+                promotion_header_id: promotionLine.promotion_header_id,
+                promotion_header_name: promotionHeaderInfo.name,
+                promotion_code: promotionHeaderInfo.promotion_code,
+                promotion_line_id: promotionLine._id,
+                total_value: totalValue,
+                start_date: promotionLine.start_date,
+                end_date: promotionLine.end_date,
+            };
+
+            result.push(promotionStatistic);
+        }
+
+        // Bước 5: Trả về kết quả
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Lỗi khi thống kê khuyến mãi:', error);
+        res.status(500).json({ message: 'Lỗi khi thống kê khuyến mãi', error });
     }
 };
