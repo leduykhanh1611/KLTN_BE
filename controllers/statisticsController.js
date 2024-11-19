@@ -579,8 +579,6 @@ exports.getPromotionStatistics = async (req, res) => {
         res.status(500).json({ message: 'Lỗi khi thống kê khuyến mãi', error });
     }
 };
-
-
 // Xuất thống kê khuyến mãi ra file Excel
 exports.exportPromotionStatisticsToExcel = async (req, res) => {
     try {
@@ -612,7 +610,7 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
         titleCell.font = { bold: true, size: 16 };
 
         worksheet.addRow([]);
-        worksheet.addRow(['Thời gian xuất báo cáo:', new Date().toLocaleString('vi-VN')]);
+        worksheet.addRow(['Thời gian xuất báo cáo:', getTimeInUTC7().toLocaleString('vi-VN')]);
         worksheet.addRow(['User xuất báo cáo:', 'Admin']);
         worksheet.addRow([]);
 
@@ -777,4 +775,15 @@ async function getPromotionStatistics(startDate, endDate) {
         console.error('Lỗi khi thống kê khuyến mãi:', error);
         
     }
+}
+
+// Function to get current time in UTC+7
+function getTimeInUTC7() {
+    const now = new Date();
+    const time = now.getTime();
+    const localOffset = now.getTimezoneOffset() * 60000; // in milliseconds
+    const utcTime = time + localOffset;
+    const utc7Offset = 7 * 60 * 60 * 1000; // UTC+7 offset in milliseconds
+    const utc7Time = new Date(utcTime + utc7Offset);
+    return utc7Time;
 }
