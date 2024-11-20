@@ -238,7 +238,7 @@ exports.generateInvoice = async (req, res) => {
 
         // Áp dụng cả khuyến mãi cố định và khuyến mãi theo phần trăm nếu có
         for (let promotion of activePromotions) {
-            const promotionHeaderId = promotion.promotion_header_id.toString();
+            const promotionHeaderId = promotion.promotion_header_id;
 
             if (promotion.discount_type == 2) {
                 // Tìm kiếm các promotion detail tương ứng với promotion line
