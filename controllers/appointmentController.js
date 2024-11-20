@@ -503,6 +503,7 @@ exports.getAppointmentsByCustomer = async (req, res) => {
     const appointments = await Appointment.find({ customer_id: customerId, is_deleted: false })
       .populate('vehicle_id')
       .populate('slot_id')
+      .populate('customer_id')
       .sort({ appointment_datetime: -1 })
       .lean();
 
