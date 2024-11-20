@@ -610,7 +610,7 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
         titleCell.font = { bold: true, size: 16 };
 
         worksheet.addRow([]);
-        worksheet.addRow(['Thời gian xuất báo cáo:', new Date().now().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })]);
+        worksheet.addRow(['Thời gian xuất báo cáo:', new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })]);
         worksheet.addRow(['User xuất báo cáo:', 'Admin']);
         worksheet.addRow([]);
 
