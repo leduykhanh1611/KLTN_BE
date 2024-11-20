@@ -197,13 +197,13 @@ exports.cancelAppointment = async (req, res) => {
   try {
     const appointment = await Appointment.findById(appointmentId);
     const inVoice = await Invoice.findOne({ appointment_id: appointmentId, is_deleted: false }).lean();
-    if (inVoice != null &&  inVoice.status == 'paid') {
+    if (inVoice != null && inVoice.status == 'paid') {
       return res.status(404).json({ msg: 'Lịch hẹn đã thanh toán, không thể xóa' });
     }
     if (!appointment || appointment.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy lịch hẹn' });
     }
-    
+
     if (appointment.status == 'completed' && appointment.status == 'cancelled') {
       return res.status(400).json({ msg: 'Không thể hủy lịch hẹn này' });
     }
@@ -520,13 +520,34 @@ exports.getAppointmentsByCustomer = async (req, res) => {
       invoiceMap[invoice.appointment_id.toString()] = invoice;
     });
 
-    // Thêm thông tin hóa đơn vào đối tượng lịch hẹn (nếu có)
-    const appointmentsWithInvoices = appointments.map(appointment => {
+    // Xử lý từng lịch hẹn để thêm thông tin hóa đơn và dịch vụ
+    const appointmentsWithInvoices = await Promise.all(appointments.map(async (appointment) => {
+      // Tìm các dịch vụ liên quan đến lịch hẹn này
+      const appointmentServices = await AppointmentService.find({ appointment_id: appointment._id, is_deleted: false })
+        .populate({
+          path: 'price_line_id',
+          populate: {
+            path: 'service_id',
+            model: 'Service',
+          },
+        })
+        .lean();
+
+      // Tạo danh sách dịch vụ cho lịch hẹn này
+      const services = appointmentServices.map(appService => ({
+        _id: appService.price_line_id.service_id._id,
+        name: appService.price_line_id.service_id.name,
+        description: appService.price_line_id.service_id.description,
+        price: appService.price_line_id.price,
+        time_required: appService.price_line_id.service_id.time_required,
+      }));
+
       return {
         ...appointment,
-        invoice: invoiceMap[appointment._id.toString()] || null, // Nếu không có hóa đơn, đặt giá trị là null
+        invoice: invoiceMap[appointment._id.toString()] || null,
+        services: services,
       };
-    });
+    }));
 
     res.json(appointmentsWithInvoices);
   } catch (err) {
@@ -534,6 +555,7 @@ exports.getAppointmentsByCustomer = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
 
 // Lấy tất cả lịch hẹn của khách hàng
 exports.getAppointmentsByCustomerWatting = async (req, res) => {
@@ -553,7 +575,7 @@ exports.getAppointmentsByCustomerWatting = async (req, res) => {
     // Tìm hóa đơn liên quan đến các lịch hẹn
     const appointmentIds = appointments.map(appointment => appointment._id);
     const invoices = await Invoice.find({ appointment_id: { $in: appointmentIds }, is_deleted: false }).lean();
-    
+
     // Tạo map để ánh xạ hóa đơn với lịch hẹn
     const invoiceMap = {};
     invoices.forEach(invoice => {
@@ -565,7 +587,7 @@ exports.getAppointmentsByCustomerWatting = async (req, res) => {
     for (let appointment of appointments) {
       // Lấy các dịch vụ liên quan đến lịch hẹn
       const appointmentServices = await AppointmentService.find({ appointment_id: appointment._id, is_deleted: false }).populate('price_line_id').lean();
-      
+
       // Tính tổng phí và thêm thông tin dịch vụ vào đối tượng lịch hẹn
       let totalCost = 0;
       const services = [];
@@ -594,7 +616,7 @@ exports.getAppointmentsByCustomerWatting = async (req, res) => {
         total_cost: totalCost,
       });
     }
-    
+
     res.json(appointmentsWithInvoices);
   } catch (err) {
     console.error('Lỗi khi lấy lịch hẹn của khách hàng:', err.message);
