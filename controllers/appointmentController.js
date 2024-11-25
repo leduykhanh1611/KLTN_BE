@@ -91,6 +91,10 @@ exports.registerAppointmentWithoutSlot = async (req, res) => {
     if (!vehicle || vehicle.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy xe' });
     }
+    const appointmentW = await Appointment.findOne({ vehicle_id: vehicle_id, status: 'waiting', is_deleted: false });
+    if (appointmentW) {
+      return res.status(408).json({ msg: 'Xe đã có lịch hẹn chờ' });
+    }
     // Tạo lịch hẹn mới
     const appointment = new Appointment({
       customer_id: vehicle.customer_id,
