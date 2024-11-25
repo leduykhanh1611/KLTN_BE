@@ -866,8 +866,8 @@ exports.getServiceRevenueStatistics = async (req, res) => {
 
                 groupedByInvoice[stat.invoice_id] = {
                     invoice_id: stat.invoice_id,
-                    purchase_code: invoice._id.toString().substring(0, 5), // 5 ký tự đầu từ _id
-                    return_code: invoice._id.toString().slice(-5), // 5 ký tự cuối từ _id
+                    purchase_code: invoice._id.toString().slice(6, 11).toUpperCase(), // 5 ký tự đầu từ _id
+                    return_code: invoice._id.toString().slice(-5).toUpperCase(), // 5 ký tự cuối từ _id
                     customer_name: invoice.customer_id.name, // Tên khách hàng từ customer_id
                     created_at: invoice.created_at, // Ngày lập hóa đơn
                     updated_at: invoice.updated_at, // Ngày trả hóa đơn
@@ -960,8 +960,8 @@ async function getServiceRevenueStatistics(startDate, endDate) {
 
                 groupedByInvoice[stat.invoice_id] = {
                     invoice_id: stat.invoice_id,
-                    purchase_code: invoice._id.toString().substring(0, 5), // First 5 characters of _id
-                    return_code: invoice._id.toString().slice(-5), // Last 5 characters of _id
+                    purchase_code: invoice._id.toString().slice(6, 11).toUpperCase(),
+                    return_code: invoice._id.toString().slice(-5).toUpperCase(), // Last 5 characters of _id
                     customer_name: invoice.customer_id.name, // Customer name
                     created_at: invoice.created_at, // Invoice creation date
                     updated_at: invoice.updated_at, // Invoice return date
