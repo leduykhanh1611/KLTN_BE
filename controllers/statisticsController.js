@@ -702,6 +702,8 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
 // function for getPromotionStatistics
 async function getPromotionStatistics(startDate, endDate) {
     try {
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
         // Bước 1: Tìm các PromotionLine trong khoảng thời gian
         const promotionLines = await PromotionLine.find({
             is_deleted: false,
