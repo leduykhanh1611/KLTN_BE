@@ -815,6 +815,14 @@ exports.createRefundInvoice = async (req, res) => {
                 await user.save();
                 console.log('user', user);
             }
+            const promotions = await Promotion.find({ invoice_id: invoiceId });
+            if (promotions) {
+                for (const promotion of promotions) {
+                    promotion.is_pay = !promotion.is_pay;
+                    promotion.is_deleted = !promotion.is_deleted;
+                    await promotion.save();
+                }
+            }
             res.status(200).json({ msg: 'Hóa đơn đã được hoàn trả' });
         }
     } catch (err) {
