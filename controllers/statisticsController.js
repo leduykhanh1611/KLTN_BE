@@ -808,7 +808,8 @@ exports.getServiceRevenueStatistics = async (req, res) => {
 
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
-        // Truy vấn và tính toán giữ nguyên
+
+        // Lấy tất cả hóa đơn trong khoảng thời gian chỉ với 1 truy vấn
         const invoices = await Invoice.find({
             is_deleted: false,
             status: 'back',
@@ -819,6 +820,7 @@ exports.getServiceRevenueStatistics = async (req, res) => {
             return res.status(200).json({ message: 'Không có hóa đơn trả nào trong khoảng thời gian này.' });
         }
 
+        // Lấy tất cả chi tiết hóa đơn liên quan
         const invoiceIds = invoices.map(invoice => invoice._id);
         const invoiceDetails = await InvoiceDetail.find({
             is_deleted: false,
@@ -829,6 +831,18 @@ exports.getServiceRevenueStatistics = async (req, res) => {
             return res.status(200).json({ message: 'Không có dịch vụ nào trong các hóa đơn trả.' });
         }
 
+        // Lấy tất cả chi tiết khuyến mãi một lần duy nhất
+        const promotionHeaderIds = invoices.flatMap(inv => inv.promotion_header_ids || []);
+        const promotionDetails = await PromotionDetail.find({
+            promotion_line_id: { $in: promotionHeaderIds },
+        }).lean();
+
+        // Tạo một Map cho chi tiết khuyến mãi để tìm nhanh hơn
+        const promotionDetailMap = new Map();
+        promotionDetails.forEach(promo => {
+            promotionDetailMap.set(promo.promotion_line_id.toString(), promo);
+        });
+
         const serviceStats = [];
         for (const detail of invoiceDetails) {
             const { service_id, price, quantity, invoice_id } = detail;
@@ -837,14 +851,17 @@ exports.getServiceRevenueStatistics = async (req, res) => {
             const relatedInvoice = invoices.find(inv => inv._id.toString() === invoice_id.toString());
             const promotionHeaderIds = relatedInvoice?.promotion_header_ids || [];
 
+            // Tính giá sau chiết khấu
             for (const promotionHeader of promotionHeaderIds) {
                 if (promotionHeader) {
-                    const promotionDetail = await PromotionDetail.findOne({ promotion_line_id: promotionHeader._id });
-                    if (promotionHeader.discount_type === 1) {
-                        discountedPrice -= (promotionDetail.discount_value / 100) * discountedPrice;
-                    } else if (promotionHeader.discount_type === 2) {
-                        if (discountedPrice >= promotionHeader.min_order_value) {
-                            discountedPrice -= (promotionDetail.discount_value / promotionDetail.min_order_value) * discountedPrice;
+                    const promotionDetail = promotionDetailMap.get(promotionHeader._id.toString());
+                    if (promotionDetail) {
+                        if (promotionHeader.discount_type === 1) {
+                            discountedPrice -= (promotionDetail.discount_value / 100) * discountedPrice;
+                        } else if (promotionHeader.discount_type === 2) {
+                            if (discountedPrice >= promotionHeader.min_order_value) {
+                                discountedPrice -= (promotionDetail.discount_value / promotionDetail.min_order_value) * discountedPrice;
+                            }
                         }
                     }
                 }
@@ -853,9 +870,9 @@ exports.getServiceRevenueStatistics = async (req, res) => {
             serviceStats.push({
                 invoice_id: invoice_id.toString(),
                 service_name: service_id.name,
-                service_code: service_id.service_code, // Lấy mã dịch vụ từ service_code
+                service_code: service_id.service_code,
                 price_before_discount: price,
-                price_after_discount: Math.max(discountedPrice, 0), // Không cho phép giá âm
+                price_after_discount: Math.max(discountedPrice, 0),
             });
         }
 
@@ -866,17 +883,17 @@ exports.getServiceRevenueStatistics = async (req, res) => {
 
                 groupedByInvoice[stat.invoice_id] = {
                     invoice_id: stat.invoice_id,
-                    purchase_code: invoice._id.toString().slice(6, 11).toUpperCase(), // 5 ký tự đầu từ _id
-                    return_code: invoice._id.toString().slice(-5).toUpperCase(), // 5 ký tự cuối từ _id
-                    customer_name: invoice.customer_id.name, // Tên khách hàng từ customer_id
-                    created_at: invoice.created_at, // Ngày lập hóa đơn
-                    updated_at: invoice.updated_at, // Ngày trả hóa đơn
+                    purchase_code: invoice._id.toString().slice(6, 11).toUpperCase(),
+                    return_code: invoice._id.toString().slice(-5).toUpperCase(),
+                    customer_name: invoice.customer_id.name,
+                    created_at: invoice.created_at,
+                    updated_at: invoice.updated_at,
                     services: [],
                 };
             }
             groupedByInvoice[stat.invoice_id].services.push({
                 service_name: stat.service_name,
-                service_code: stat.service_code, // Mã dịch vụ
+                service_code: stat.service_code,
                 price_before_discount: stat.price_before_discount,
                 price_after_discount: stat.price_after_discount,
             });
@@ -890,6 +907,7 @@ exports.getServiceRevenueStatistics = async (req, res) => {
         res.status(500).json({ message: 'Lỗi khi thống kê doanh thu dịch vụ', error });
     }
 };
+
 
 async function getServiceRevenueStatistics(startDate, endDate) {
     try {
@@ -920,24 +938,44 @@ async function getServiceRevenueStatistics(startDate, endDate) {
             return { message: 'Không có dịch vụ nào trong các hóa đơn trả.', data: [] };
         }
 
+        // Fetch all promotion details in one query
+        const promotionHeaderIds = invoices.flatMap(inv => inv.promotion_header_ids || []);
+        const promotionDetails = await PromotionDetail.find({
+            promotion_line_id: { $in: promotionHeaderIds },
+        }).lean();
+
+        // Create a map for promotion details for quick access
+        const promotionDetailMap = new Map();
+        promotionDetails.forEach(promo => {
+            promotionDetailMap.set(promo.promotion_line_id.toString(), promo);
+        });
+
+        // Create a map for invoices for quick access
+        const invoiceMap = new Map();
+        invoices.forEach(invoice => {
+            invoiceMap.set(invoice._id.toString(), invoice);
+        });
+
         const serviceStats = [];
         for (const detail of invoiceDetails) {
             const { service_id, price, quantity, invoice_id } = detail;
             let discountedPrice = price; // Default price before discounts
 
             // Find the related invoice
-            const relatedInvoice = invoices.find(inv => inv._id.toString() === invoice_id.toString());
+            const relatedInvoice = invoiceMap.get(invoice_id.toString());
             const promotionHeaderIds = relatedInvoice?.promotion_header_ids || [];
 
             // Apply discounts if available
             for (const promotionHeader of promotionHeaderIds) {
                 if (promotionHeader) {
-                    const promotionDetail = await PromotionDetail.findOne({ promotion_line_id: promotionHeader._id });
-                    if (promotionHeader.discount_type === 1) {
-                        discountedPrice -= (promotionDetail.discount_value / 100) * discountedPrice;
-                    } else if (promotionHeader.discount_type === 2) {
-                        if (discountedPrice >= promotionHeader.min_order_value) {
-                            discountedPrice -= (promotionDetail.discount_value / promotionDetail.min_order_value) * discountedPrice;
+                    const promotionDetail = promotionDetailMap.get(promotionHeader._id.toString());
+                    if (promotionDetail) {
+                        if (promotionHeader.discount_type === 1) {
+                            discountedPrice -= (promotionDetail.discount_value / 100) * discountedPrice;
+                        } else if (promotionHeader.discount_type === 2) {
+                            if (discountedPrice >= promotionHeader.min_order_value) {
+                                discountedPrice -= (promotionDetail.discount_value / promotionDetail.min_order_value) * discountedPrice;
+                            }
                         }
                     }
                 }
@@ -956,7 +994,7 @@ async function getServiceRevenueStatistics(startDate, endDate) {
         const groupedByInvoice = {};
         for (const stat of serviceStats) {
             if (!groupedByInvoice[stat.invoice_id]) {
-                const invoice = invoices.find(inv => inv._id.toString() === stat.invoice_id);
+                const invoice = invoiceMap.get(stat.invoice_id);
 
                 groupedByInvoice[stat.invoice_id] = {
                     invoice_id: stat.invoice_id,
