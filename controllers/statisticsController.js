@@ -1,8 +1,10 @@
 const Invoice = require('../models/Invoice');
+const InvoiceDetail = require('../models/InvoiceDetail');
 const Appointment = require('../models/Appointment');
 const Promotion = require('../models/Promotion');
 const PromotionHeader = require('../models/PromotionHeader');
 const PromotionLine = require('../models/PromotionLine');
+const PromotionDetail = require('../models/PromotionDetail');
 const XLSX = require('xlsx');
 const StyledXLSX = require('xlsx-style');
 const XLSXStyle = require('xlsx-js-style');
@@ -789,3 +791,91 @@ function getTimeInUTC7() {
     const utc7Time = new Date(utcTime + utc7Offset);
     return utc7Time;
 }
+
+exports.getServiceRevenueStatistics = async (req, res) => {
+    try {
+        const startDate = new Date(req.query.start_date);
+        const endDate = new Date(req.query.end_date);
+
+        // Truy vấn và tính toán giữ nguyên
+        const invoices = await Invoice.find({
+            is_deleted: false,
+            status: 'back',
+            updated_at: { $gte: startDate, $lte: endDate },
+        }).populate('promotion_header_ids customer_id').lean();
+
+        if (invoices.length === 0) {
+            return res.status(200).json({ message: 'Không có hóa đơn trả nào trong khoảng thời gian này.' });
+        }
+
+        const invoiceIds = invoices.map(invoice => invoice._id);
+        const invoiceDetails = await InvoiceDetail.find({
+            is_deleted: false,
+            invoice_id: { $in: invoiceIds },
+        }).populate('service_id').lean();
+
+        if (invoiceDetails.length === 0) {
+            return res.status(200).json({ message: 'Không có dịch vụ nào trong các hóa đơn trả.' });
+        }
+
+        const serviceStats = [];
+        for (const detail of invoiceDetails) {
+            const { service_id, price, quantity, invoice_id } = detail;
+            let discountedPrice = price; // Giá mặc định chưa chiết khấu
+
+            const relatedInvoice = invoices.find(inv => inv._id.toString() === invoice_id.toString());
+            const promotionHeaderIds = relatedInvoice?.promotion_header_ids || [];
+
+            for (const promotionHeader of promotionHeaderIds) {
+                if (promotionHeader) {
+                    const promotionDetail = await PromotionDetail.findOne({ promotion_line_id: promotionHeader._id });
+                    if (promotionHeader.discount_type === 1) {
+                        discountedPrice -= (promotionDetail.discount_value / 100) * discountedPrice;
+                    } else if (promotionHeader.discount_type === 2) {
+                        if (discountedPrice >= promotionHeader.min_order_value) {
+                            discountedPrice -= (promotionDetail.discount_value / promotionDetail.min_order_value) * discountedPrice;
+                        }
+                    }
+                }
+            }
+
+            serviceStats.push({
+                invoice_id: invoice_id.toString(),
+                service_name: service_id.name,
+                service_code: service_id.service_code, // Lấy mã dịch vụ từ service_code
+                price_before_discount: price,
+                price_after_discount: Math.max(discountedPrice, 0), // Không cho phép giá âm
+            });
+        }
+
+        const groupedByInvoice = {};
+        for (const stat of serviceStats) {
+            if (!groupedByInvoice[stat.invoice_id]) {
+                const invoice = invoices.find(inv => inv._id.toString() === stat.invoice_id);
+
+                groupedByInvoice[stat.invoice_id] = {
+                    invoice_id: stat.invoice_id,
+                    purchase_code: invoice._id.toString().substring(0, 5), // 5 ký tự đầu từ _id
+                    return_code: invoice._id.toString().slice(-5), // 5 ký tự cuối từ _id
+                    customer_name: invoice.customer_id.name, // Tên khách hàng từ customer_id
+                    created_at: invoice.created_at, // Ngày lập hóa đơn
+                    updated_at: invoice.updated_at, // Ngày trả hóa đơn
+                    services: [],
+                };
+            }
+            groupedByInvoice[stat.invoice_id].services.push({
+                service_name: stat.service_name,
+                service_code: stat.service_code, // Mã dịch vụ
+                price_before_discount: stat.price_before_discount,
+                price_after_discount: stat.price_after_discount,
+            });
+        }
+
+        const result = Object.values(groupedByInvoice);
+
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('Lỗi khi thống kê doanh thu dịch vụ:', error);
+        res.status(500).json({ message: 'Lỗi khi thống kê doanh thu dịch vụ', error });
+    }
+};

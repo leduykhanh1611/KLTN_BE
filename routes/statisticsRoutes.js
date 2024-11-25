@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getRevenueByTimePeriod, getAppointmentsByTimePeriod,exportPromotionStatisticsToExcel, getMonthlyStatistics, exportStatisticsToExcel, exportRevenueStatisticsToExcel, getRevenueStatistics, getPromotionStatistics } = require('../controllers/statisticsController');
+const { getRevenueByTimePeriod, getAppointmentsByTimePeriod,exportPromotionStatisticsToExcel,getServiceRevenueStatistics, getMonthlyStatistics, exportStatisticsToExcel, exportRevenueStatisticsToExcel, getRevenueStatistics, getPromotionStatistics } = require('../controllers/statisticsController');
 
 // @route   GET /api/statistics/revenue
 // @desc    Lấy doanh thu theo khoảng thời gian
@@ -11,6 +11,11 @@ router.get('/revenue', getRevenueByTimePeriod);
 // @desc    Lấy lịch hẹn theo khoảng thời gian
 // @access  Private (Chỉ admin hoặc nhân viên)
 router.get('/appointments', getAppointmentsByTimePeriod);
+
+// @route   GET /api/statistics/serviceRevenue
+// @desc    Lấy những hóa đơn trả
+// @access  Private (Chỉ admin hoặc nhân viên)
+router.get('/serviceRevenue', getServiceRevenueStatistics);
 
 // @route   GET /api/statistics/monthly
 // @desc    Lấy thống kê theo tháng
