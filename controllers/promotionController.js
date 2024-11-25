@@ -590,7 +590,6 @@ exports.getAllPromotionDetails = async (req, res) => {
 exports.getAllPromotionLines = async (req, res) => {
     try {
         const currentDate = new Date(); // Get the current date and time
-
         const promotionLines = await PromotionLine.find({
             is_deleted: false,
             is_active: true,
@@ -602,15 +601,15 @@ exports.getAllPromotionLines = async (req, res) => {
             match: {
                 is_deleted: false,
                 is_active: true,
-                start_date: { $lte: currentDate },
-                end_date: { $gte: currentDate }
+                // start_date: { $lte: currentDate },
+                // end_date: { $gte: currentDate }
             }
         });
 
         // Filter out any promotion lines where the populated header doesn't match the criteria
-        const activePromotionLines = promotionLines.filter(line => line.promotion_header_id);
+        // const activePromotionLines = promotionLines.filter(line => line.promotion_header_id);
 
-        res.status(200).json(activePromotionLines);
+        res.status(200).json(promotionLines);
     } catch (err) {
         console.error('Lỗi khi lấy danh sách dòng khuyến mãi:', err.message);
         res.status(500).send('Lỗi máy chủ');

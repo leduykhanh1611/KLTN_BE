@@ -52,6 +52,11 @@ router.post('/:promotionHeaderId/lines', [auth, isAdmin], addPromotionLine);
 // @access  Private (chỉ admin)
 router.post('/lines/:promotionLineId/details', [auth, isAdmin], addPromotionDetail);
 
+
+// @route   GET /api/promotions/mobile/lines
+// @desc    Lấy tất cả dòng khuyến mãi
+// @access  Private (chỉ admin)
+router.get('/mobile/getAll/lines', auth, getAllPromotionLines);
 // @route   GET /api/promotions
 // @desc    Lấy tất cả chương trình khuyến mãi
 // @access  Public
@@ -122,8 +127,5 @@ router.get('/:promotionHeaderId/details', getPromotionWithDetails);
 // @access  Private (chỉ admin)
 router.get('/line/details/:promotionLineId', [auth, isAdmin], getAllPromotionDetails);
 
-// @route   GET /api/promotions/mobile/lines
-// @desc    Lấy tất cả dòng khuyến mãi
-// @access  Private (chỉ admin)
-router.get('/mobile/getAll/lines', auth, getAllPromotionLines);
+
 module.exports = router;
