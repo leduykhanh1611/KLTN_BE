@@ -132,17 +132,38 @@ exports.registerAppointmentWithoutSlot = async (req, res) => {
 // Lấy tất cả lịch hẹn không có slot 
 exports.getAllAppointmentsWithoutSlot = async (req, res) => {
   try {
+    // Bước 1: Lấy tất cả lịch hẹn không có slot và không bị xóa
     const appointments = await Appointment.find({ slot_id: null, is_deleted: false })
-      .populate('customer_id')
-      .populate('vehicle_id')
+      .populate('customer_id') // Populate thông tin khách hàng
+      .populate('vehicle_id') // Populate thông tin phương tiện
       .lean();
-    res.json(appointments);
+
+    if (appointments.length === 0) {
+      return res.json([]); // Nếu không có lịch hẹn nào, trả về mảng rỗng
+    }
+
+    // Bước 2: Lấy danh sách _id của các lịch hẹn
+    const appointmentIds = appointments.map(appointment => appointment._id);
+
+    // Tìm tất cả hóa đơn liên quan đến các lịch hẹn
+    const invoices = await Invoice.find({ 
+      appointment_id: { $in: appointmentIds }, // Điều kiện liên quan đến danh sách appointment_id
+      status: 'paid', // Chỉ lấy hóa đơn có status là 'paid'
+      is_deleted: false // Hóa đơn không bị xóa
+    }).lean();
+
+    // Bước 3: Lọc các lịch hẹn có hóa đơn paid
+    const paidAppointmentIds = invoices.map(invoice => invoice.appointment_id.toString()); // Lấy danh sách appointment_id từ hóa đơn
+    const filteredAppointments = appointments.filter(appointment => 
+      paidAppointmentIds.includes(appointment._id.toString()) // Kiểm tra nếu appointment_id nằm trong danh sách
+    );
+
+    res.json(filteredAppointments); // Trả về kết quả
   } catch (err) {
-    console.error('Lỗi khi lấy tất cả lịch hẹn:', err.message);
+    console.error('Lỗi khi lấy lịch hẹn có status paid:', err.message);
     res.status(500).send('Lỗi máy chủ');
   }
 };
-
 // Lấy thông tin lịch hẹn cùng các dịch vụ liên quan và tổng phí
 exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
   const { appointmentId } = req.params;
