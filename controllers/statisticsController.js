@@ -19,7 +19,8 @@ exports.getRevenueByTimePeriod = async (req, res) => {
     // Chuyển đổi các chuỗi ngày thành đối tượng Date và đảm bảo rằng cả hai đều hợp lệ
     const startDate = new Date(start_date);
     const endDate = new Date(end_date);
-
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
     // Kiểm tra nếu ngày bắt đầu hoặc ngày kết thúc không hợp lệ
     if (isNaN(startDate) || isNaN(endDate)) {
         return res.status(400).json({ msg: 'Ngày bắt đầu hoặc ngày kết thúc không hợp lệ' });
@@ -88,7 +89,8 @@ exports.getAppointmentsByTimePeriod = async (req, res) => {
     // Chuyển đổi các chuỗi ngày thành đối tượng Date
     const startDate = new Date(start_date);
     const endDate = new Date(end_date);
-
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
     // Kiểm tra nếu ngày bắt đầu hoặc ngày kết thúc không hợp lệ
     if (isNaN(startDate) || isNaN(endDate)) {
         return res.status(400).json({ msg: 'Ngày bắt đầu hoặc ngày kết thúc không hợp lệ' });
@@ -120,7 +122,8 @@ exports.getMonthlyStatistics = async (req, res) => {
     // Tạo đối tượng Date cho ngày đầu tháng và ngày cuối tháng
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0); // Ngày cuối cùng của tháng
-
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
     try {
         // Lấy tổng số lịch hẹn đã hoàn thành
         const appointmentsCount = await Appointment.countDocuments({
@@ -210,6 +213,8 @@ exports.exportRevenueStatisticsToExcel = async (req, res) => {
         const startDate = new Date(start_date);
         const endDate = new Date(end_date);
 
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
         if (isNaN(startDate) || isNaN(endDate)) {
             return res.status(400).json({ msg: 'Ngày không hợp lệ' });
         }
@@ -396,7 +401,8 @@ exports.getRevenueStatistics = async (req, res) => {
 
         const startDate = new Date(start_date);
         const endDate = new Date(end_date);
-
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
         if (isNaN(startDate) || isNaN(endDate)) {
             return res.status(400).json({ msg: 'Ngày không hợp lệ' });
         }
@@ -505,6 +511,8 @@ exports.getPromotionStatistics = async (req, res) => {
     try {
         const startDate = new Date(req.query.start_date);
         const endDate = new Date(req.query.end_date);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
 
         // Bước 1: Tìm các PromotionLine trong khoảng thời gian
         const promotionLines = await PromotionLine.find({
@@ -586,7 +594,8 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
     try {
         const startDate = new Date(req.query.start_date);
         const endDate = new Date(req.query.end_date);
-
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
         // Fetch promotion statistics (replace with your actual data fetching logic)
         const promotionStatistics = await getPromotionStatistics(startDate, endDate);
 
@@ -797,6 +806,8 @@ exports.getServiceRevenueStatistics = async (req, res) => {
         const startDate = new Date(req.query.start_date);
         const endDate = new Date(req.query.end_date);
 
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
         // Truy vấn và tính toán giữ nguyên
         const invoices = await Invoice.find({
             is_deleted: false,
@@ -877,5 +888,234 @@ exports.getServiceRevenueStatistics = async (req, res) => {
     } catch (error) {
         console.error('Lỗi khi thống kê doanh thu dịch vụ:', error);
         res.status(500).json({ message: 'Lỗi khi thống kê doanh thu dịch vụ', error });
+    }
+};
+
+async function getServiceRevenueStatistics(startDate, endDate) {
+    try {
+        // Set time boundaries for the query
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+
+        // Query invoices within the given time range
+        const invoices = await Invoice.find({
+            is_deleted: false,
+            status: 'back',
+            updated_at: { $gte: startDate, $lte: endDate },
+        }).populate('promotion_header_ids customer_id').lean();
+
+        if (invoices.length === 0) {
+            return { message: 'Không có hóa đơn trả nào trong khoảng thời gian này.', data: [] };
+        }
+
+        const invoiceIds = invoices.map(invoice => invoice._id);
+
+        // Query invoice details related to the fetched invoices
+        const invoiceDetails = await InvoiceDetail.find({
+            is_deleted: false,
+            invoice_id: { $in: invoiceIds },
+        }).populate('service_id').lean();
+
+        if (invoiceDetails.length === 0) {
+            return { message: 'Không có dịch vụ nào trong các hóa đơn trả.', data: [] };
+        }
+
+        const serviceStats = [];
+        for (const detail of invoiceDetails) {
+            const { service_id, price, quantity, invoice_id } = detail;
+            let discountedPrice = price; // Default price before discounts
+
+            // Find the related invoice
+            const relatedInvoice = invoices.find(inv => inv._id.toString() === invoice_id.toString());
+            const promotionHeaderIds = relatedInvoice?.promotion_header_ids || [];
+
+            // Apply discounts if available
+            for (const promotionHeader of promotionHeaderIds) {
+                if (promotionHeader) {
+                    const promotionDetail = await PromotionDetail.findOne({ promotion_line_id: promotionHeader._id });
+                    if (promotionHeader.discount_type === 1) {
+                        discountedPrice -= (promotionDetail.discount_value / 100) * discountedPrice;
+                    } else if (promotionHeader.discount_type === 2) {
+                        if (discountedPrice >= promotionHeader.min_order_value) {
+                            discountedPrice -= (promotionDetail.discount_value / promotionDetail.min_order_value) * discountedPrice;
+                        }
+                    }
+                }
+            }
+
+            serviceStats.push({
+                invoice_id: invoice_id.toString(),
+                service_name: service_id.name,
+                service_code: service_id.service_code, // Fetch service code
+                price_before_discount: price,
+                price_after_discount: Math.max(discountedPrice, 0), // Prevent negative prices
+            });
+        }
+
+        // Group the results by invoice
+        const groupedByInvoice = {};
+        for (const stat of serviceStats) {
+            if (!groupedByInvoice[stat.invoice_id]) {
+                const invoice = invoices.find(inv => inv._id.toString() === stat.invoice_id);
+
+                groupedByInvoice[stat.invoice_id] = {
+                    invoice_id: stat.invoice_id,
+                    purchase_code: invoice._id.toString().substring(0, 5), // First 5 characters of _id
+                    return_code: invoice._id.toString().slice(-5), // Last 5 characters of _id
+                    customer_name: invoice.customer_id.name, // Customer name
+                    created_at: invoice.created_at, // Invoice creation date
+                    updated_at: invoice.updated_at, // Invoice return date
+                    services: [],
+                };
+            }
+            groupedByInvoice[stat.invoice_id].services.push({
+                service_name: stat.service_name,
+                service_code: stat.service_code, // Service code
+                price_before_discount: stat.price_before_discount,
+                price_after_discount: stat.price_after_discount,
+            });
+        }
+
+        const result = Object.values(groupedByInvoice);
+
+        return { message: 'Thành công', data: result };
+    } catch (error) {
+        console.error('Lỗi khi thống kê doanh thu dịch vụ:', error);
+        return { message: 'Lỗi khi thống kê doanh thu dịch vụ', error };
+    }
+}
+
+exports.exportReturnInvoiceStatistics = async (req, res) => {
+    try {
+        const startDate = new Date(req.query.start_date);
+        const endDate = new Date(req.query.end_date);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+
+        // Fetch returned invoice statistics
+        const { message, data: returnInvoices } = await getServiceRevenueStatistics(startDate, endDate);
+
+        if (!returnInvoices || returnInvoices.length === 0) {
+            return res.status(200).json({ message });
+        }
+
+        // Create a new workbook and add a worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Báo cáo hóa đơn trả');
+
+        // Hide gridlines
+        worksheet.properties.defaultGridlines = false;
+        worksheet.properties.tabColor = { argb: 'FF0000FF' }; // Blue tab color
+
+        // Add metadata
+        worksheet.mergeCells('A1:H1');
+        const titleCell = worksheet.getCell('A1');
+        titleCell.value = 'BÁO CÁO HÓA ĐƠN TRẢ';
+        titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+        titleCell.font = { bold: true, size: 16 };
+
+        worksheet.addRow([]);
+        worksheet.addRow(['Thời gian xuất báo cáo:', new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })]);
+        worksheet.addRow(['User xuất báo cáo:', 'Admin']);
+        worksheet.addRow([]);
+
+        // Add header
+        const headerRow = worksheet.addRow([
+            'STT',
+            'Hóa Đơn Mua',
+            'Ngày Đơn Hàng Mua',
+            'Hóa Đơn Trả',
+            'Ngày Đơn Hàng Trả',
+            'Tên Khách Hàng',
+            'Mã Sản Phẩm',
+            'Tên Sản Phẩm',
+            'Số Lượng',
+            'Giá Trước Chiết Khấu',
+            'Giá Sau Chiết Khấu',
+        ]);
+
+        // Style the header row
+        headerRow.eachCell({ includeEmpty: false }, (cell) => {
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FF538DD5' },
+            };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' },
+            };
+        });
+
+        // Populate rows with data
+        let index = 1;
+        returnInvoices.forEach((invoice) => {
+            invoice.services.forEach((service) => {
+                const row = worksheet.addRow([
+                    index,
+                    invoice.purchase_code,
+                    new Date(invoice.created_at).toLocaleDateString('vi-VN'),
+                    invoice.return_code,
+                    new Date(invoice.updated_at).toLocaleDateString('vi-VN'),
+                    invoice.customer_name,
+                    service.service_code,
+                    service.service_name,
+                    1, // Assuming quantity is always 1; adjust as needed
+                    service.price_before_discount,
+                    service.price_after_discount,
+                ]);
+
+                // Apply number formatting and alignment
+                row.getCell(10).numFmt = '#,##0'; // Giá Trước Chiết Khấu
+                row.getCell(11).numFmt = '#,##0'; // Giá Sau Chiết Khấu
+                row.alignment = { vertical: 'middle' };
+
+                // Apply border to each cell
+                row.eachCell((cell) => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' },
+                    };
+                });
+
+                index++;
+            });
+        });
+
+        // Adjust column widths
+        worksheet.getColumn(1).width = 10; // STT
+        worksheet.getColumn(2).width = 20; // Hóa Đơn Mua
+        worksheet.getColumn(3).width = 20; // Ngày Đơn Hàng Mua
+        worksheet.getColumn(4).width = 20; // Hóa Đơn Trả
+        worksheet.getColumn(5).width = 20; // Ngày Đơn Hàng Trả
+        worksheet.getColumn(6).width = 30; // Tên Khách Hàng
+        worksheet.getColumn(7).width = 15; // Mã Sản Phẩm
+        worksheet.getColumn(8).width = 40; // Tên Sản Phẩm
+        worksheet.getColumn(9).width = 10; // Số Lượng
+        worksheet.getColumn(10).width = 20; // Giá Trước Chiết Khấu
+        worksheet.getColumn(11).width = 20; // Giá Sau Chiết Khấu
+
+        // Disable gridlines
+        worksheet.views = [{ showGridLines: false }];
+
+        // Generate buffer
+        const buffer = await workbook.xlsx.writeBuffer();
+
+        // Format file name
+        const fileName = `BaoCao_HoaDonTra_Tu_${startDate.toISOString().split('T')[0]}_Den_${endDate.toISOString().split('T')[0]}.xlsx`;
+
+        // Send file to client
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.status(200).send(buffer);
+    } catch (error) {
+        console.error('Lỗi khi xuất báo cáo hóa đơn trả:', error);
+        res.status(500).json({ message: 'Lỗi khi xuất báo cáo hóa đơn trả', error });
     }
 };
