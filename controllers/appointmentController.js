@@ -569,6 +569,8 @@ exports.getAppointmentsByCustomer = async (req, res) => {
         description: appService.price_line_id.service_id.description,
         price: appService.price_line_id.price,
         time_required: appService.price_line_id.service_id.time_required,
+        is_done: appService.is_done,
+        time_completed: appService.time_completed,
       }));
 
       return {
