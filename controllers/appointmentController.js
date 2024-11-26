@@ -198,6 +198,7 @@ exports.getAppointmentDetailsWithTotalCost = async (req, res) => {
 
       services.push({
         _id: service._id,
+        appServiceId: appService._id,
         name: service.name,
         description: service.description,
         price: price,
