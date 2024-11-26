@@ -232,23 +232,23 @@ exports.exportRevenueStatisticsToExcel = async (req, res) => {
             },
         }).populate('customer_id employee_id');
 
-        const invoiceData = invoices.map(invoice => {
-            return {
-                date: new Date(invoice.created_at).toLocaleDateString('vi-VN'),
-                employeeCode: String(invoice.employee_id._id || '').substring(0, 5).toUpperCase(),
-                employeeName: invoice.employee_id?.name || '',
-                discount: Math.round(invoice.discount_amount),
-                revenueBeforeDiscount: Math.round(invoice.total_amount),
-                revenueAfterDiscount: Math.round(invoice.final_amount),
-            };
-        });
+        const invoiceData = invoices.map(invoice => ({
+            date: new Date(invoice.created_at).toLocaleDateString('vi-VN'),
+            employeeCode: String(invoice.employee_id?._id || '').substring(0, 5).toUpperCase(),
+            employeeName: invoice.employee_id?.name || '',
+            discount: Math.round(invoice.discount_amount),
+            revenueBeforeDiscount: Math.round(invoice.total_amount),
+            revenueAfterDiscount: Math.round(invoice.final_amount),
+        }));
 
         const borderStyle = { top: { style: 'thin' }, bottom: { style: 'thin' } };
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Doanh Số Bán Hàng Theo Ngày');
         worksheet.properties.tabColor = { argb: 'FF0000FF' }; // ARGB format for blue color
-        worksheet.properties.defaultRowHeight = 20; // Set default row height to 30
-        worksheet.properties.defaultColWidth = 20; // Set default column width to 20
+        worksheet.properties.defaultRowHeight = 20; // Default row height
+        worksheet.properties.defaultColWidth = 20; // Default column width
+        worksheet.views = [{showGridLines: false}]; // Hide gridlines
+
         // Header Information
         worksheet.mergeCells('A1:G1');
         worksheet.getCell('A1').value = 'Tên Cửa Hàng: L&K TECH';
@@ -263,122 +263,120 @@ exports.exportRevenueStatisticsToExcel = async (req, res) => {
         // Add title and date range rows
         worksheet.mergeCells('A4:G4');
         worksheet.getCell('A4').value = 'DOANH SỐ BÁN HÀNG THEO NGÀY';
-        worksheet.getCell('A4').font = { bold: true, size: 16 };;
+        worksheet.getCell('A4').font = { bold: true, size: 16 };
         worksheet.getCell('A4').alignment = { horizontal: 'center' };
 
         worksheet.mergeCells('A5:G5');
         worksheet.getCell('A5').value = `Từ ngày: ${formattedStartDate}       Đến ngày: ${formattedEndDate}`;
-        // worksheet.getCell('A5').font = { bold: true };
         worksheet.getCell('A5').alignment = { horizontal: 'centerContinuous' };
 
-        // Table Headers
-        worksheet.addRow([]);
+        // Header Row
         const headerRow = worksheet.addRow(['STT', 'NVBH', 'Tên NVBH', 'Ngày', 'Chiết khấu', 'Doanh số trước CK', 'Doanh số sau CK']);
         headerRow.eachCell((cell) => {
             cell.border = borderStyle;
             cell.font = { bold: true };
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
         });
-        worksheet.getRow(6).font = { bold: true };
-        worksheet.getRow(6).alignment = { vertical: 'middle', horizontal: 'center' };
-        worksheet.views = [{ showGridLines: false }];
 
-        let currentDate = '';
-        let rowIndex = 7;
-        let dailyTotalDiscount = 0;
-        let dailyTotalRevenueBeforeDiscount = 0;
-        let dailyTotalRevenueAfterDiscount = 0;
+        // Add Grand Total Row
         let grandTotalDiscount = 0;
         let grandTotalRevenueBeforeDiscount = 0;
         let grandTotalRevenueAfterDiscount = 0;
-        let employeeCounter = 1;
-        let employeeSTT = 1;
 
-        // Loop through invoice data to process each date and employee's transactions
+        invoiceData.forEach(data => {
+            grandTotalDiscount += data.discount;
+            grandTotalRevenueBeforeDiscount += data.revenueBeforeDiscount;
+            grandTotalRevenueAfterDiscount += data.revenueAfterDiscount;
+        });
+
+        const grandTotalRowData = ['Tổng cộng', '', '', '', grandTotalDiscount, grandTotalRevenueBeforeDiscount, grandTotalRevenueAfterDiscount];
+        const grandTotalRow = worksheet.addRow(grandTotalRowData);
+        grandTotalRow.eachCell((cell, colNumber) => {
+            cell.font = { bold: true };
+            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            cell.border = borderStyle;
+            if (colNumber >= 5 && colNumber <= 7) {
+                cell.numFmt = '#,##0';
+            }
+        });
+
+        // Process invoice data
+        let currentDate = '';
+        let dailyTotalDiscount = 0;
+        let dailyTotalRevenueBeforeDiscount = 0;
+        let dailyTotalRevenueAfterDiscount = 0;
+
         invoiceData.forEach((data, index) => {
             if (data.date !== currentDate) {
-                // Add subtotal row for the previous date if there was a change in date
                 if (currentDate !== '') {
-                    const subtotalRow = worksheet.addRow(['', '', '', 'Tổng cộng theo ngày', dailyTotalDiscount, dailyTotalRevenueBeforeDiscount, dailyTotalRevenueAfterDiscount]);
-                    subtotalRow.font = { italic: true, bold: true }; // Italic and bold for subtotal row
-                    subtotalRow.alignment = { vertical: 'middle', horizontal: 'center' };
-                    subtotalRow.eachCell((cell) => {
+                    // Thêm hàng tổng cộng cho ngày trước đó lên trên
+                    const combinedRow = worksheet.addRow([
+                        '', '', '', 'Tổng cộng theo ngày',
+                        dailyTotalDiscount, dailyTotalRevenueBeforeDiscount, dailyTotalRevenueAfterDiscount,
+                    ]);
+                    combinedRow.eachCell((cell, colNumber) => {
+                        cell.font = { italic: true, bold: true };
+                        cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'left' : 'center' };
                         cell.border = borderStyle;
-                        if (cell._column._key === 'E' || cell._column._key === 'F' || cell._column._key === 'G') {
-                            cell.numFmt = '#,##0'; // Format as integer with commas
+
+                        if (colNumber >= 5 && colNumber <= 7) {
+                            cell.numFmt = '#,##0';
                         }
                     });
-                    rowIndex++;
+
+                    // Reset các biến tổng cho ngày tiếp theo
                     dailyTotalDiscount = 0;
                     dailyTotalRevenueBeforeDiscount = 0;
                     dailyTotalRevenueAfterDiscount = 0;
                 }
 
-                // Start a new date section
+                // Cập nhật ngày hiện tại và thêm hàng "Ngày"
                 currentDate = data.date;
                 const dateRow = worksheet.addRow([`Ngày: ${currentDate}`]);
-                dateRow.font = { bold: true }; // Bold font for date row
-                dateRow.alignment = { vertical: 'middle', horizontal: 'center' };
                 dateRow.eachCell((cell) => {
+                    cell.font = { bold: true };
+                    cell.alignment = { vertical: 'middle', horizontal: 'left' };
                     cell.border = borderStyle;
                 });
-                rowIndex++;
-                employeeCounter = 1;
-                employeeSTT = 1;
             }
 
-            // Add transaction row for the current employee and date
-            const transactionRow = worksheet.addRow([employeeSTT, data.employeeCode, data.employeeName, data.date, data.discount, data.revenueBeforeDiscount, data.revenueAfterDiscount]);
-            transactionRow.alignment = { vertical: 'middle', horizontal: 'center' };
-            transactionRow.eachCell((cell) => {
-                if (cell._column._key === 'E' || cell._column._key === 'F' || cell._column._key === 'G') {
+            // Thêm hàng dữ liệu chi tiết
+            const transactionRow = worksheet.addRow([
+                index + 1, data.employeeCode, data.employeeName, data.date,
+                data.discount, data.revenueBeforeDiscount, data.revenueAfterDiscount,
+            ]);
+            transactionRow.eachCell((cell, colNumber) => {
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = borderStyle;
+                if (colNumber >= 5 && colNumber <= 7) {
                     cell.numFmt = '#,##0';
                 }
-                cell.border = borderStyle;
             });
 
-            // Accumulate daily and grand totals
+            // Cộng dồn tổng ngày
             dailyTotalDiscount += data.discount;
             dailyTotalRevenueBeforeDiscount += data.revenueBeforeDiscount;
             dailyTotalRevenueAfterDiscount += data.revenueAfterDiscount;
-            grandTotalDiscount += data.discount;
-            grandTotalRevenueBeforeDiscount += data.revenueBeforeDiscount;
-            grandTotalRevenueAfterDiscount += data.revenueAfterDiscount;
-
-            rowIndex++;
-            employeeSTT++;
         });
 
-        // Add the final subtotal row for the last date after looping
+        // Thêm hàng tổng cộng cho ngày cuối cùng
         if (currentDate !== '') {
-            const finalSubtotalRow = worksheet.addRow(['', '', '', 'Tổng cộng theo ngày', dailyTotalDiscount, dailyTotalRevenueBeforeDiscount, dailyTotalRevenueAfterDiscount]);
-            finalSubtotalRow.font = { italic: true, bold: true }; // Italic and bold for final subtotal row
-            finalSubtotalRow.alignment = { vertical: 'middle', horizontal: 'center' };
-            finalSubtotalRow.eachCell((cell) => {
+            const combinedRow = worksheet.addRow([
+                '', '', '', 'Tổng cộng theo ngày',
+                dailyTotalDiscount, dailyTotalRevenueBeforeDiscount, dailyTotalRevenueAfterDiscount,
+            ]);
+            combinedRow.eachCell((cell, colNumber) => {
+                cell.font = { italic: true, bold: true };
+                cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'left' : 'center' };
                 cell.border = borderStyle;
-                if (cell._column._key === 'E' || cell._column._key === 'F' || cell._column._key === 'G') {
+
+                if (colNumber >= 5 && colNumber <= 7) {
                     cell.numFmt = '#,##0';
                 }
             });
-            rowIndex++;
         }
 
 
-        // Add final grand total row with a border, center alignment, and bold font
-        const grandTotalRowData = ['Tổng cộng', '', '', '', grandTotalDiscount, grandTotalRevenueBeforeDiscount, grandTotalRevenueAfterDiscount];
-        const grandTotalRow = worksheet.addRow(grandTotalRowData);
-
-        // Apply formatting to each cell in the grand total row
-        grandTotalRow.eachCell((cell, colNumber) => {
-            cell.font = { bold: true }; // Set font to bold
-            cell.alignment = { vertical: 'middle', horizontal: 'center' }; // Center alignment
-            cell.border = borderStyle; // Apply border style
-
-            // Apply number format only to specific columns
-            if (colNumber >= 5 && colNumber <= 7) { // Columns E, F, G for discount and revenue
-                cell.numFmt = '#,##0'; // Format as integer with commas
-            }
-        });
 
         const buffer = await workbook.xlsx.writeBuffer();
         const name = `Thong_Ke_Tu_${start_date}_Den_${end_date}.xlsx`;
@@ -731,6 +729,7 @@ async function getPromotionStatistics(startDate, endDate) {
             promotion_header_id: { $in: promotionLineIds },
             is_deleted: false,
             is_pay: true,
+            created_at: { $gte: startDate, $lte: endDate },
         });
 
         // Bước 3: Nhóm Promotion theo promotion_line_id
@@ -786,7 +785,7 @@ async function getPromotionStatistics(startDate, endDate) {
         return result;
     } catch (error) {
         console.error('Lỗi khi thống kê khuyến mãi:', error);
-        
+
     }
 }
 
@@ -800,7 +799,7 @@ function getTimeInUTC7() {
     const utc7Time = new Date(utcTime + utc7Offset);
     return utc7Time;
 }
-
+// xuất thống kê doanh thu dịch vụ ra file Excel
 exports.getServiceRevenueStatistics = async (req, res) => {
     try {
         const startDate = new Date(req.query.start_date);
@@ -908,7 +907,7 @@ exports.getServiceRevenueStatistics = async (req, res) => {
     }
 };
 
-
+// lấy dữ liệu thống kê hóa đơn trả
 async function getServiceRevenueStatistics(startDate, endDate) {
     try {
         // Set time boundaries for the query
@@ -1022,7 +1021,7 @@ async function getServiceRevenueStatistics(startDate, endDate) {
         return { message: 'Lỗi khi thống kê doanh thu dịch vụ', error };
     }
 }
-
+// Xuất báo cáo thống kê hóa đơn trả ra file Excel
 exports.exportReturnInvoiceStatistics = async (req, res) => {
     try {
         const startDate = new Date(req.query.start_date);
@@ -1060,8 +1059,8 @@ exports.exportReturnInvoiceStatistics = async (req, res) => {
         // Add header
         const headerRow = worksheet.addRow([
             'STT',
-            'Hóa Đơn Mua',
-            'Ngày Đơn Hàng Mua',
+            'Hóa Đơn Bán',
+            'Ngày Đơn Hàng Bán',
             'Hóa Đơn Trả',
             'Ngày Đơn Hàng Trả',
             'Tên Khách Hàng',
