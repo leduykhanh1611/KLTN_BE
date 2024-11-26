@@ -16,6 +16,13 @@ const AppointmentServiceSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    is_done: {
+      type: Boolean,
+      default: false,
+    },
+    time_completed: {
+      type: Date,
+    },
   },
   { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } }
 );

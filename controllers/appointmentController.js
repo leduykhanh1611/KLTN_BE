@@ -649,3 +649,26 @@ exports.getAppointmentsByCustomerWatting = async (req, res) => {
     res.status(500).send('Lỗi máy chủ');
   }
 };
+
+// cập nhật dịch vụ dã hoàn thành của lịch hẹn
+exports.updateServiceStatus = async (req, res) => {
+  const { appointmentServiceId } = req.params;
+
+  try {
+    // Tìm dịch vụ của lịch hẹn
+    const appointmentService = await AppointmentService.findById(appointmentServiceId);
+    if (!appointmentService || appointmentService.is_deleted) {
+      return res.status(404).json({ msg: 'Không tìm thấy dịch vụ' });
+    }
+
+    // Cập nhật trạng thái dịch vụ thành "completed"
+    appointmentService.is_done = !appointmentService.is_done;
+    appointmentService.time_completed = Date.now();
+    await appointmentService.save();
+
+    res.json({ msg: 'Cập nhật trạng thái dịch vụ thành công', appointmentService });
+  } catch (err) {
+    console.error('Lỗi khi cập nhật trạng thái dịch vụ:', err.message);
+    res.status(500).send('Lỗi máy chủ');
+  }
+};

@@ -13,7 +13,8 @@ const {
   getAllAppointmentsWithoutSlot,
   addSlotToAppointment,
   getAppointmentsByCustomer,
-  getAppointmentsByCustomerWatting
+  getAppointmentsByCustomerWatting,
+  updateServiceStatus
 } = require('../controllers/appointmentController');
 
 const auth = require('../middleware/auth');
@@ -85,5 +86,9 @@ router.get('/mobile/appointment/customer/:customerId', auth, getAppointmentsByCu
 // @access  Private (phải đăng nhập)
 router.get('/mobile/appointment/customer/watting/:customerId', auth, getAppointmentsByCustomerWatting);
 
+// @route   PUT /api/appointmentService/:appointmentServiceId
+// @desc    Cập nhật trạng thái dịch vụ
+// @access  Private (phải đăng nhập)
+router.put('/service/:appointmentServiceId', auth, updateServiceStatus);
 
 module.exports = router;
