@@ -247,7 +247,7 @@ exports.exportRevenueStatisticsToExcel = async (req, res) => {
         worksheet.properties.tabColor = { argb: 'FF0000FF' }; // ARGB format for blue color
         worksheet.properties.defaultRowHeight = 20; // Default row height
         worksheet.properties.defaultColWidth = 20; // Default column width
-        worksheet.views = [{showGridLines: false}]; // Hide gridlines
+        worksheet.views = [{ showGridLines: false }]; // Hide gridlines
 
         // Header Information
         worksheet.mergeCells('A1:G1');
@@ -592,6 +592,7 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
     try {
         const startDate = new Date(req.query.start_date);
         const endDate = new Date(req.query.end_date);
+
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
         // Fetch promotion statistics (replace with your actual data fetching logic)
@@ -919,7 +920,9 @@ async function getServiceRevenueStatistics(startDate, endDate) {
             is_deleted: false,
             status: 'back',
             updated_at: { $gte: startDate, $lte: endDate },
-        }).populate('promotion_header_ids customer_id').lean();
+        }).populate('promotion_header_ids customer_id')
+        .sort({ created_at : 1 }) // Sort by creation date
+        .lean();
 
         if (invoices.length === 0) {
             return { message: 'Không có hóa đơn trả nào trong khoảng thời gian này.', data: [] };
@@ -1028,7 +1031,9 @@ exports.exportReturnInvoiceStatistics = async (req, res) => {
         const endDate = new Date(req.query.end_date);
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
-
+        // Format dates to dd/MM/yyyy
+        const formattedStartDate = startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const formattedEndDate = endDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
         // Fetch returned invoice statistics
         const { message, data: returnInvoices } = await getServiceRevenueStatistics(startDate, endDate);
 
@@ -1050,7 +1055,9 @@ exports.exportReturnInvoiceStatistics = async (req, res) => {
         titleCell.value = 'BÁO CÁO HÓA ĐƠN TRẢ';
         titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
         titleCell.font = { bold: true, size: 16 };
-
+        worksheet.mergeCells('A3:H3');
+        worksheet.getCell('A3').value = `Từ ngày: ${formattedStartDate}       Đến ngày: ${formattedEndDate}`;
+        worksheet.getCell('A3').alignment = { horizontal: 'centerContinuous' };
         worksheet.addRow([]);
         worksheet.addRow(['Thời gian xuất báo cáo:', new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })]);
         worksheet.addRow(['User xuất báo cáo:', 'Admin']);
@@ -1089,30 +1096,32 @@ exports.exportReturnInvoiceStatistics = async (req, res) => {
         });
 
         // Populate rows with data
-        let index = 1;
+        let index = 1; // Biến đếm cho STT
         returnInvoices.forEach((invoice) => {
-            invoice.services.forEach((service) => {
+            const startRow = worksheet.rowCount + 1; // Hàng bắt đầu của hóa đơn này
+
+            invoice.services.forEach((service, serviceIndex) => {
                 const row = worksheet.addRow([
-                    index,
-                    invoice.purchase_code,
-                    new Date(invoice.created_at).toLocaleDateString('vi-VN'),
-                    invoice.return_code,
-                    new Date(invoice.updated_at).toLocaleDateString('vi-VN'),
-                    invoice.customer_name,
-                    service.service_code,
-                    service.service_name,
-                    1, // Assuming quantity is always 1; adjust as needed
-                    service.price_before_discount,
-                    service.price_after_discount,
+                    index, // STT chỉ hiển thị ở hàng đầu tiên của hóa đơn
+                    serviceIndex === 0 ? invoice.purchase_code : null, // Merge purchase_code
+                    serviceIndex === 0 ? new Date(invoice.created_at).toLocaleDateString('vi-VN') : null, // Merge ngày đơn hàng bán
+                    serviceIndex === 0 ? invoice.return_code : null, // Merge return_code
+                    serviceIndex === 0 ? new Date(invoice.updated_at).toLocaleDateString('vi-VN') : null, // Merge ngày đơn hàng trả
+                    serviceIndex === 0 ? invoice.customer_name : null, // Merge tên khách hàng
+                    service.service_code, // Mã sản phẩm
+                    service.service_name, // Tên sản phẩm
+                    1, // Giả định số lượng là 1
+                    service.price_before_discount, // Giá trước chiết khấu
+                    service.price_after_discount, // Giá sau chiết khấu
                 ]);
 
-                // Apply number formatting and alignment
+                // Apply formatting for numeric cells
                 row.getCell(10).numFmt = '#,##0'; // Giá Trước Chiết Khấu
                 row.getCell(11).numFmt = '#,##0'; // Giá Sau Chiết Khấu
-                row.alignment = { vertical: 'middle' };
 
-                // Apply border to each cell
+                // Apply alignment and border to each cell
                 row.eachCell((cell) => {
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' }; // Căn giữa
                     cell.border = {
                         top: { style: 'thin' },
                         left: { style: 'thin' },
@@ -1120,13 +1129,29 @@ exports.exportReturnInvoiceStatistics = async (req, res) => {
                         right: { style: 'thin' },
                     };
                 });
-
-                index++;
             });
+
+            const endRow = worksheet.rowCount; // Hàng kết thúc của hóa đơn này
+
+            // Merge cells for the shared fields
+            worksheet.mergeCells(`A${startRow}:A${endRow}`); // Merge STT
+            worksheet.mergeCells(`B${startRow}:B${endRow}`); // Merge purchase_code
+            worksheet.mergeCells(`C${startRow}:C${endRow}`); // Merge ngày đơn hàng bán
+            worksheet.mergeCells(`D${startRow}:D${endRow}`); // Merge return_code
+            worksheet.mergeCells(`E${startRow}:E${endRow}`); // Merge ngày đơn hàng trả
+            worksheet.mergeCells(`F${startRow}:F${endRow}`); // Merge tên khách hàng
+
+            // Apply alignment for merged cells
+            ['A', 'B', 'C', 'D', 'E', 'F'].forEach((col) => {
+                const cell = worksheet.getCell(`${col}${startRow}`);
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }; // Căn giữa
+            });
+
+            index++; // Tăng số thứ tự cho hóa đơn tiếp theo
         });
 
         // Adjust column widths
-        worksheet.getColumn(1).width = 10; // STT
+        worksheet.getColumn(1).width = 25; // STT
         worksheet.getColumn(2).width = 20; // Hóa Đơn Mua
         worksheet.getColumn(3).width = 20; // Ngày Đơn Hàng Mua
         worksheet.getColumn(4).width = 20; // Hóa Đơn Trả
