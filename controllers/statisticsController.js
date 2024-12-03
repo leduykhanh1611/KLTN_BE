@@ -515,7 +515,7 @@ exports.getPromotionStatistics = async (req, res) => {
         // Bước 1: Tìm các PromotionLine trong khoảng thời gian
         const promotionLines = await PromotionLine.find({
             is_deleted: false,
-            start_date: { $gte: startDate, $lte: endDate },
+            // start_date: { $gte: startDate, $lte: endDate },
         }).select('_id promotion_header_id start_date end_date');
 
         if (promotionLines.length === 0) {
