@@ -515,10 +515,11 @@ exports.getPromotionStatistics = async (req, res) => {
         // Bước 1: Tìm các PromotionLine trong khoảng thời gian
         const promotionLines = await PromotionLine.find({
             is_deleted: false,
+            // start_date: { $lte: endDate, $gte: startDate },
         }).select('_id promotion_header_id start_date end_date');
 
         if (promotionLines.length === 0) {
-            return { message: 'Không có chương trình khuyến mãi nào trong khoảng thời gian này.' };
+            res.status(200).json({ message: 'Không có chương trình khuyến mãi nào trong khoảng thời gian này.' });
         }
 
         // Bước 2: Lấy tất cả các Promotion liên quan
@@ -591,13 +592,16 @@ exports.getPromotionStatistics = async (req, res) => {
                 promotion_header_name: promotionHeaderInfo.name,
                 promotion_code: promotionHeaderInfo.promotion_code,
                 promotion_line_id: promotionLine._id,
-                total_value: totalPromotionValue,
+                total_value: totalPromotionValue, // Tổng giá trị khuyến mãi
+                total_invoice_value: totalInvoiceValue, // Tổng giá trị hóa đơn
                 start_date: promotionHeaderInfo.start_date,
                 end_date: promotionHeaderInfo.end_date,
             };
 
+
             result.push(promotionStatistic);
         }
+
 
         // Bước 5: Trả về kết quả
         res.status(200).json(result);
@@ -745,6 +749,7 @@ async function getPromotionStatistics(startDate, endDate) {
         // Bước 1: Tìm các PromotionLine trong khoảng thời gian
         const promotionLines = await PromotionLine.find({
             is_deleted: false,
+            start_date: { $lte: endDate, $gte: startDate },
         }).select('_id promotion_header_id start_date end_date');
 
         if (promotionLines.length === 0) {
@@ -826,7 +831,7 @@ async function getPromotionStatistics(startDate, endDate) {
                 start_date: promotionHeaderInfo.start_date,
                 end_date: promotionHeaderInfo.end_date,
             };
-       
+
 
             result.push(promotionStatistic);
         }
@@ -838,15 +843,15 @@ async function getPromotionStatistics(startDate, endDate) {
     }
 }
 
-     // {
-            //     "promotion_header_id": "6732272174d781a974781784",
-            //     "promotion_header_name": "Chương trình khuyến mãi 3 tháng cuối năm",
-            //     "promotion_code": "PROMO12",
-            //     "promotion_line_id": "6732274d74d781a974781791",
-            //     "total_value": 0,
-            //     "start_date": "2024-10-01T00:00:00.000Z",
-            //     "end_date": "2024-12-30T00:00:00.000Z"
-            // }
+// {
+//     "promotion_header_id": "6732272174d781a974781784",
+//     "promotion_header_name": "Chương trình khuyến mãi 3 tháng cuối năm",
+//     "promotion_code": "PROMO12",
+//     "promotion_line_id": "6732274d74d781a974781791",
+//     "total_value": 0,
+//     "start_date": "2024-10-01T00:00:00.000Z",
+//     "end_date": "2024-12-30T00:00:00.000Z"
+// }
 
 // Function to get current time in UTC+7
 function getTimeInUTC7() {
@@ -979,8 +984,8 @@ async function getServiceRevenueStatistics(startDate, endDate) {
             status: 'back',
             updated_at: { $gte: startDate, $lte: endDate },
         }).populate('promotion_header_ids customer_id')
-        .sort({ created_at : 1 }) // Sort by creation date
-        .lean();
+            .sort({ created_at: 1 }) // Sort by creation date
+            .lean();
 
         if (invoices.length === 0) {
             return { message: 'Không có hóa đơn trả nào trong khoảng thời gian này.', data: [] };
