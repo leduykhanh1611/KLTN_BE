@@ -595,15 +595,19 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
 
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
+        // Format dates to dd/MM/yyyy
+        const formattedStartDate = startDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const formattedEndDate = endDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
         // Fetch promotion statistics (replace with your actual data fetching logic)
         const promotionStatistics = await getPromotionStatistics(startDate, endDate);
-
+        console.log(promotionStatistics);
         if (!promotionStatistics || promotionStatistics.length === 0) {
             return res.status(200).json({ message: 'Không có dữ liệu để xuất báo cáo.' });
         }
 
         // Calculate total promotion value
-        const totalValue = promotionStatistics.reduce((sum, promo) => sum + promo.total_value, 0);
+        const totalValue = promotionStatistics.reduce((sum, promo) => sum + promo.total_promotion_value, 0);
+        const totalValueCell = promotionStatistics.reduce((sum, promo) => sum + promo.total_invoice_value, 0);
 
         // Create a new workbook and add a worksheet
         const workbook = new ExcelJS.Workbook();
@@ -618,14 +622,16 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
         titleCell.value = 'BÁO CÁO TỔNG KẾT CTKM';
         titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
         titleCell.font = { bold: true, size: 16 };
-
+        worksheet.mergeCells('A2:E2');
+        worksheet.getCell('A2').value = `Từ ngày: ${formattedStartDate}       Đến ngày: ${formattedEndDate}`;
+        worksheet.getCell('A2').alignment = { horizontal: 'centerContinuous' };
         worksheet.addRow([]);
         worksheet.addRow(['Thời gian xuất báo cáo:', new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })]);
         worksheet.addRow(['User xuất báo cáo:', 'Admin']);
         worksheet.addRow([]);
 
         // Add header
-        const headerRow = worksheet.addRow(['Mã CTKM', 'Tên CTKM', 'Ngày bắt đầu', 'Ngày kết thúc', 'Số tiền chiết khấu']);
+        const headerRow = worksheet.addRow(['Mã CTKM', 'Tên CTKM', 'Ngày bắt đầu', 'Ngày kết thúc', 'Số tiền chiết khấu', 'Doanh thu']);
 
         // Apply styles to each cell in the header row
         headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
@@ -651,11 +657,13 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
                 promo.promotion_header_name,
                 new Date(promo.start_date).toLocaleDateString('vi-VN'),
                 new Date(promo.end_date).toLocaleDateString('vi-VN'),
-                promo.total_value,
+                promo.total_promotion_value,
+                promo.total_invoice_value
             ]);
 
             // Format the 'Số tiền chiết khấu' column as currency
             row.getCell(5).numFmt = '#,##0';
+            row.getCell(6).numFmt = '#,##0';
             row.alignment = { vertical: 'middle' };
 
             // Apply border to data cells
@@ -670,10 +678,10 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
         });
 
         // Add total row
-        const totalRow = worksheet.addRow(['Tổng CTKM', '', '', '', totalValue]);
+        const totalRow = worksheet.addRow(['Tổng CTKM', '', '', '', totalValue, totalValueCell]);
         totalRow.alignment = { horizontal: 'center', vertical: 'middle' };
         totalRow.getCell(5).numFmt = '#,##0';
-
+        totalRow.getCell(6).numFmt = '#,##0';
         // Apply border to total row
         totalRow.eachCell((cell) => {
             cell.border = {
@@ -691,6 +699,7 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
         worksheet.getColumn(3).width = 15; // Ngày bắt đầu
         worksheet.getColumn(4).width = 15; // Ngày kết thúc
         worksheet.getColumn(5).width = 20; // Số tiền chiết khấu
+        worksheet.getColumn(6).width = 20; // Số tiền chiết khấu
 
         worksheet.views = [{ showGridLines: false }];
         // Generate buffer
@@ -709,19 +718,18 @@ exports.exportPromotionStatisticsToExcel = async (req, res) => {
     }
 };
 
-// function for getPromotionStatistics
 async function getPromotionStatistics(startDate, endDate) {
     try {
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
+
         // Bước 1: Tìm các PromotionLine trong khoảng thời gian
         const promotionLines = await PromotionLine.find({
             is_deleted: false,
-            start_date: { $gte: startDate, $lte: endDate },
         }).select('_id promotion_header_id start_date end_date');
 
         if (promotionLines.length === 0) {
-            return res.status(200).json({ message: 'Không có chương trình khuyến mãi nào trong khoảng thời gian này.' });
+            return { message: 'Không có chương trình khuyến mãi nào trong khoảng thời gian này.' };
         }
 
         // Bước 2: Lấy tất cả các Promotion liên quan
@@ -756,15 +764,34 @@ async function getPromotionStatistics(startDate, endDate) {
             });
         });
 
-        // Bước 4: Sử dụng vòng lặp để tính toán và tạo kết quả
+        // Bước 4: Lấy tất cả Invoice liên quan
+        const invoiceIds = promotions.map(promo => promo.invoice_id).filter(id => id);
+        const invoices = await Invoice.find({
+            _id: { $in: invoiceIds },
+            is_deleted: false,
+        }).select('_id total_amount discount_amount');
+
+        // Tạo Map Invoice để tính tổng giá trị hóa đơn
+        const invoiceMap = new Map();
+        invoices.forEach(invoice => {
+            invoiceMap.set(invoice._id.toString(), invoice.total_amount);
+        });
+
+        // Bước 5: Sử dụng vòng lặp để tính toán và tạo kết quả
         const result = [];
 
         for (const promotionLine of promotionLines) {
             const lineId = promotionLine._id.toString();
             const promotionsForLine = promotionMap.get(lineId) || [];
 
-            // Tính tổng giá trị khuyến mãi
-            const totalValue = promotionsForLine.reduce((sum, promo) => sum + promo.value, 0);
+            // Tính tổng giá trị khuyến mãi từ bảng Promotion
+            const totalPromotionValue = promotionsForLine.reduce((sum, promo) => sum + promo.value, 0);
+
+            // Tính tổng giá trị hóa đơn từ bảng Invoice
+            const totalInvoiceValue = promotionsForLine.reduce((sum, promo) => {
+                const invoiceValue = invoiceMap.get(promo.invoice_id?.toString()) || 0;
+                return sum + invoiceValue;
+            }, 0);
 
             // Lấy thông tin PromotionHeader từ Map
             const promotionHeaderInfo = promotionHeaderMap.get(promotionLine.promotion_header_id.toString()) || { name: 'Unknown', promotion_code: 'Unknown' };
@@ -775,7 +802,8 @@ async function getPromotionStatistics(startDate, endDate) {
                 promotion_header_name: promotionHeaderInfo.name,
                 promotion_code: promotionHeaderInfo.promotion_code,
                 promotion_line_id: promotionLine._id,
-                total_value: totalValue,
+                total_promotion_value: totalPromotionValue, // Tổng giá trị khuyến mãi
+                total_invoice_value: totalInvoiceValue, // Tổng giá trị hóa đơn
                 start_date: promotionHeaderInfo.start_date,
                 end_date: promotionHeaderInfo.end_date,
             };
@@ -786,9 +814,11 @@ async function getPromotionStatistics(startDate, endDate) {
         return result;
     } catch (error) {
         console.error('Lỗi khi thống kê khuyến mãi:', error);
-
+        throw new Error('Đã xảy ra lỗi trong quá trình thống kê.');
     }
 }
+
+
 
 // Function to get current time in UTC+7
 function getTimeInUTC7() {
