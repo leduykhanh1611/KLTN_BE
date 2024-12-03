@@ -515,11 +515,10 @@ exports.getPromotionStatistics = async (req, res) => {
         // Bước 1: Tìm các PromotionLine trong khoảng thời gian
         const promotionLines = await PromotionLine.find({
             is_deleted: false,
-            // start_date: { $gte: startDate, $lte: endDate },
         }).select('_id promotion_header_id start_date end_date');
 
         if (promotionLines.length === 0) {
-            return res.status(200).json({ message: 'Không có chương trình khuyến mãi nào trong khoảng thời gian này.' });
+            return { message: 'Không có chương trình khuyến mãi nào trong khoảng thời gian này.' };
         }
 
         // Bước 2: Lấy tất cả các Promotion liên quan
@@ -528,6 +527,7 @@ exports.getPromotionStatistics = async (req, res) => {
             promotion_header_id: { $in: promotionLineIds },
             is_deleted: false,
             is_pay: true,
+            created_at: { $gte: startDate, $lte: endDate },
         });
 
         // Bước 3: Nhóm Promotion theo promotion_line_id
@@ -553,15 +553,34 @@ exports.getPromotionStatistics = async (req, res) => {
             });
         });
 
-        // Bước 4: Sử dụng vòng lặp để tính toán và tạo kết quả
+        // Bước 4: Lấy tất cả Invoice liên quan
+        const invoiceIds = promotions.map(promo => promo.invoice_id).filter(id => id);
+        const invoices = await Invoice.find({
+            _id: { $in: invoiceIds },
+            is_deleted: false,
+        }).select('_id total_amount discount_amount');
+
+        // Tạo Map Invoice để tính tổng giá trị hóa đơn
+        const invoiceMap = new Map();
+        invoices.forEach(invoice => {
+            invoiceMap.set(invoice._id.toString(), invoice.total_amount);
+        });
+
+        // Bước 5: Sử dụng vòng lặp để tính toán và tạo kết quả
         const result = [];
 
         for (const promotionLine of promotionLines) {
             const lineId = promotionLine._id.toString();
             const promotionsForLine = promotionMap.get(lineId) || [];
 
-            // Tính tổng giá trị khuyến mãi
-            const totalValue = promotionsForLine.reduce((sum, promo) => sum + promo.value, 0);
+            // Tính tổng giá trị khuyến mãi từ bảng Promotion
+            const totalPromotionValue = promotionsForLine.reduce((sum, promo) => sum + promo.value, 0);
+
+            // Tính tổng giá trị hóa đơn từ bảng Invoice
+            const totalInvoiceValue = promotionsForLine.reduce((sum, promo) => {
+                const invoiceValue = invoiceMap.get(promo.invoice_id?.toString()) || 0;
+                return sum + invoiceValue;
+            }, 0);
 
             // Lấy thông tin PromotionHeader từ Map
             const promotionHeaderInfo = promotionHeaderMap.get(promotionLine.promotion_header_id.toString()) || { name: 'Unknown', promotion_code: 'Unknown' };
@@ -572,7 +591,7 @@ exports.getPromotionStatistics = async (req, res) => {
                 promotion_header_name: promotionHeaderInfo.name,
                 promotion_code: promotionHeaderInfo.promotion_code,
                 promotion_line_id: promotionLine._id,
-                total_value: totalValue,
+                total_value: totalPromotionValue,
                 start_date: promotionHeaderInfo.start_date,
                 end_date: promotionHeaderInfo.end_date,
             };
@@ -807,6 +826,7 @@ async function getPromotionStatistics(startDate, endDate) {
                 start_date: promotionHeaderInfo.start_date,
                 end_date: promotionHeaderInfo.end_date,
             };
+       
 
             result.push(promotionStatistic);
         }
@@ -818,7 +838,15 @@ async function getPromotionStatistics(startDate, endDate) {
     }
 }
 
-
+     // {
+            //     "promotion_header_id": "6732272174d781a974781784",
+            //     "promotion_header_name": "Chương trình khuyến mãi 3 tháng cuối năm",
+            //     "promotion_code": "PROMO12",
+            //     "promotion_line_id": "6732274d74d781a974781791",
+            //     "total_value": 0,
+            //     "start_date": "2024-10-01T00:00:00.000Z",
+            //     "end_date": "2024-12-30T00:00:00.000Z"
+            // }
 
 // Function to get current time in UTC+7
 function getTimeInUTC7() {
