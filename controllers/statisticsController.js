@@ -749,7 +749,7 @@ async function getPromotionStatistics(startDate, endDate) {
         // Bước 1: Tìm các PromotionLine trong khoảng thời gian
         const promotionLines = await PromotionLine.find({
             is_deleted: false,
-            start_date: { $lte: endDate, $gte: startDate },
+            // start_date: { $lte: endDate, $gte: startDate },
         }).select('_id promotion_header_id start_date end_date');
 
         if (promotionLines.length === 0) {
