@@ -485,7 +485,12 @@ exports.updatePromotionDetail = async (req, res) => {
         if (!promotionDetail || promotionDetail.is_deleted) {
             return res.status(404).json({ msg: 'Không tìm thấy chi tiết khuyến mãi' });
         }
-
+        let promotionLine = await PromotionLine.findById(promotionDetail.promotion_line_id);
+        let promotionHeader = await PromotionHeader.findById(promotionLine.promotion_header_id);
+        let invoice = await Invoice.find({ promotion_header_id: promotionHeader._id });
+        if (invoice.length > 0) {
+            return res.status(400).json({ msg: 'Khuyến mãi này đang được sử dụng trong hóa đơn' });
+        }
         // Cập nhật thông tin nếu có
         if (applicable_rank_id) promotionDetail.applicable_rank_id = applicable_rank_id;
         if (service_id) promotionDetail.service_id = service_id;
@@ -587,29 +592,6 @@ exports.getAllPromotionDetails = async (req, res) => {
 };
 
 // Lấy tất cả line khuyến mãi với các điều kiện
-exports.getAllPromotionLines = async (req, res) => {
-    try {
-        const currentDate = new Date(); // Get the current date and time
-        const promotionLines = await PromotionLine.find({
-            is_deleted: false,
-            is_active: true,
-            start_date: { $lte: currentDate },
-            end_date: { $gte: currentDate }
-        })
-        .populate({
-            path: 'promotion_header_id',
-            match: {
-                is_deleted: false,
-                is_active: true,
-            }
-        });
-
-        res.status(200).json(promotionLines);
-    } catch (err) {
-        console.error('Lỗi khi lấy danh sách dòng khuyến mãi:', err.message);
-        res.status(500).send('Lỗi máy chủ');
-    }
-};
 exports.getAllPromotionLines = async (req, res) => {
     try {
         const currentDate = new Date(); // Lấy thời gian hiện tại

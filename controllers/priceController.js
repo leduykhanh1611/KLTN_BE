@@ -292,7 +292,7 @@ exports.updatePriceLine = async (req, res) => {
   }
 
   try {
-    let appointmentService = await AppointmentService.findOne({ price_line : priceLineId });
+    let appointmentService = await AppointmentService.find({ price_line : priceLineId });
     if (appointmentService) {
       return res.status(400).json({ msg: 'Không thể cập nhật giá đã được sử dụng trong lịch hẹn' });
     }
