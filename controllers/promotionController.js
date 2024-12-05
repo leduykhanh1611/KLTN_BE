@@ -601,13 +601,47 @@ exports.getAllPromotionLines = async (req, res) => {
             match: {
                 is_deleted: false,
                 is_active: true,
-                // start_date: { $lte: currentDate },
-                // end_date: { $gte: currentDate }
             }
         });
 
-        // Filter out any promotion lines where the populated header doesn't match the criteria
-        // const activePromotionLines = promotionLines.filter(line => line.promotion_header_id);
+        res.status(200).json(promotionLines);
+    } catch (err) {
+        console.error('Lỗi khi lấy danh sách dòng khuyến mãi:', err.message);
+        res.status(500).send('Lỗi máy chủ');
+    }
+};
+exports.getAllPromotionLines = async (req, res) => {
+    try {
+        const currentDate = new Date(); // Lấy thời gian hiện tại
+        const promotionLines = await PromotionLine.aggregate([
+            {
+                $match: {
+                    is_deleted: false,
+                    is_active: true,
+                    start_date: { $lte: currentDate },
+                    end_date: { $gte: currentDate }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'promotionheaders', // Tên collection của PromotionHeader
+                    localField: 'promotion_header_id',
+                    foreignField: '_id',
+                    as: 'promotion_header',
+                    pipeline: [
+                        {
+                            $match: {
+                                is_deleted: false,
+                                is_active: true,
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                $unwind: '$promotion_header'
+            }
+        ]);
 
         res.status(200).json(promotionLines);
     } catch (err) {
