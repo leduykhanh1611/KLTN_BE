@@ -248,7 +248,7 @@ exports.updatePromotionHeader = async (req, res) => {
 exports.updatePromotionLine = async (req, res) => {
     const { promotionLineId } = req.params;
     const { discount_type, description, is_active, start_date, end_date } = req.body;
-    let promotionDetail = await PromotionDetail.find({ promotion_line_id: promotionLineId });
+    let promotionLine = await PromotionLine.findById(promotionLineId);
     if (is_active != null && discount_type == null && description == null && start_date == null && end_date == null) {
         promotionLine.is_active = is_active;
         promotionLine.updated_at = Date.now();
