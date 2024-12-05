@@ -86,7 +86,7 @@ exports.addPriceLine = async (req, res) => {
 exports.getAllPriceHeaders = async (req, res) => {
   try {
     // Tìm tất cả các bảng giá không bị xóa
-    const priceHeaders = await PriceHeader.find({ is_deleted: false });
+    const priceHeaders = await PriceHeader.find({ is_deleted: false }).sort({ is_active: -1 });
 
     res.json(priceHeaders);
   } catch (err) {
