@@ -285,6 +285,10 @@ exports.updatePriceLine = async (req, res) => {
     if (!priceLine || priceLine.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy chi tiết giá' });
     }
+    let price = await PriceLine.findOne({service_id: priceLine.service_id,vehicle_type_id: priceLine.vehicle_type_id, is_active: true, is_deleted: false});
+    if (price) {
+      return res.status(400).json({ msg: 'Giá của dịch vụ cho loại xe trên đã tồn tại' });
+    }
     priceLine.is_active = is_active;
     priceLine.updated_at = Date.now();
     await priceLine.save();
