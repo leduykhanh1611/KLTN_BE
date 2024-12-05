@@ -138,7 +138,7 @@ exports.addPromotionDetail = async (req, res) => {
 exports.getAllPromotions = async (req, res) => {
     try {
         // Tìm tất cả các chương trình khuyến mãi không bị xóa
-        const promotions = await PromotionHeader.find({ is_deleted: false  });
+        const promotions = await PromotionHeader.find({ is_deleted: false  }).sort({ is_active: -1 });
 
         res.json(promotions);
     } catch (err) {
