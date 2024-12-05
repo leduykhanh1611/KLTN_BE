@@ -1,7 +1,9 @@
+const { cp } = require('fs');
 const PriceHeader = require('../models/PriceHeader');
 const PriceLine = require('../models/PriceLine');
 const Service = require('../models/Service');
 const VehicleType = require('../models/VehicleType');
+const AppointmentService = require('../models/AppointmentService');
 // Thêm bảng giá mới
 exports.addPriceHeader = async (req, res) => {
   const { price_list_name, start_date, end_date } = req.body;
@@ -56,7 +58,7 @@ exports.addPriceLine = async (req, res) => {
   if ( priceHeader.end_date <= Date.now()) {
     return res.status(400).json({ msg: 'Bảng giá đã hết hạn' });
   }
-  const priceLine = await PriceLine.findOne({ price_header_id: priceHeaderId, service_id: service_id,vehicle_type_id: vehicle_type_id, is_deleted: false });
+  const priceLine = await PriceLine.findOne({service_id: service_id,vehicle_type_id: vehicle_type_id, is_active: true, is_deleted: false});
   if (priceLine) {
     return res.status(400).json({ msg: 'Giá của dịch vụ cho loại xe trên đã tồn tại' });
   }
@@ -290,6 +292,10 @@ exports.updatePriceLine = async (req, res) => {
   }
 
   try {
+    let appointmentService = await AppointmentService.findOne({ price_line : priceLineId });
+    if (appointmentService) {
+      return res.status(400).json({ msg: 'Không thể cập nhật giá đã được sử dụng trong lịch hẹn' });
+    }
     let priceLine = await PriceLine.findById(priceLineId);
     if (!priceLine || priceLine.is_deleted) {
       return res.status(404).json({ msg: 'Không tìm thấy chi tiết giá' });
