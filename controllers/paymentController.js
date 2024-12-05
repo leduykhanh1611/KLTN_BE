@@ -690,7 +690,7 @@ exports.getInvoiceAndGeneratePDF = async (req, res) => {
 
             drawPromotionRow(currentY, {
                 name: promotion.description,
-                discountType: promotion.discount_type === 1 ? 'Phần trăm' : 'Trực tiếp',
+                discountType: promotion.discount_type == 1 ? 'Phần trăm' : 'Trực tiếp',
                 discountValue: discountValue
             });
 
