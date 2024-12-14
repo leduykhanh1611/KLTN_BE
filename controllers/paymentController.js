@@ -286,10 +286,10 @@ exports.generateInvoice = async (req, res) => {
 
                 // Tìm promotion detail phù hợp với hạng khách hàng và có discount_value cao nhất
                 const validPromotionDetails = promotionDetails
-                    .filter(detail =>
-                        detail.applicable_rank_id &&
-                        detail.applicable_rank_id.equals(appointment.customer_id.customer_rank_id)
-                    )
+                    // .filter(detail =>
+                    //     detail.applicable_rank_id &&
+                    //     detail.applicable_rank_id.equals(appointment.customer_id.customer_rank_id)
+                    // )
                     .sort((a, b) => b.discount_value - a.discount_value); // Sắp xếp theo discount_value giảm dần
 
                 if (validPromotionDetails.length > 0) {
