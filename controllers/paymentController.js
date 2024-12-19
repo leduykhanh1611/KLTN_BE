@@ -353,7 +353,7 @@ exports.generateInvoice = async (req, res) => {
             // Lặp qua addedPromotionLines, chứa thông tin chi tiết về khuyến mãi
             for (const [lineId, promotion] of addedPromotionHeaders.entries()) {
                 const promotionValue =
-                    promotion.discount_type === 2
+                    promotion.discount_value > 100
                         ? fixedDiscount // Giá trị giảm giá cố định
                         : totalAmount * (promotion.discount_value / 100); // Giá trị giảm giá theo phần trăm
         
