@@ -354,7 +354,7 @@ exports.generateInvoice = async (req, res) => {
             for (const [lineId, promotion] of addedPromotionHeaders.entries()) {
                 const promotionValue =
                     promotion.discount_type === 2
-                        ? promotion.discount_value // Giá trị giảm giá cố định
+                        ? fixedDiscount // Giá trị giảm giá cố định
                         : totalAmount * (promotion.discount_value / 100); // Giá trị giảm giá theo phần trăm
         
                 promotionsToSave.push(new Promotion({
